@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+*.pyc
+
+# Node
+node_modules/
+frontend/dist/
+.vite/
+
+# Environment
+.env
+.env.local
+*.env
+!.env.example
+
+# Runtime data (not committed)
+data/
+logs/
+config/user_config.json
+config/.key
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker
+.docker/
+
+# Claude Code
+.claude/
+CLAUDE.md
+DESIGN.md
