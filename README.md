@@ -24,11 +24,8 @@
 cp .env.example .env
 # 编辑 .env 填写 SMTP 等配置
 
-# 使用预构建镜像部署
-docker-compose -f docker-compose.prod.yml up -d
-
-# 或本地构建部署
-docker-compose up -d --build
+# 拉取镜像并启动
+docker-compose pull && docker-compose up -d
 ```
 
 访问 http://localhost（前端）和 http://localhost:8000（API）
@@ -120,7 +117,7 @@ npm run dev
 
 **前端**: React 19 · TypeScript · Vite · Tailwind CSS · Recharts · Lucide Icons · IBM Plex Sans
 
-**部署**: Docker · nginx · GitHub Actions CI/CD · GHCR
+**部署**: Docker · nginx · GitHub Actions CI/CD（推送即构建）· GHCR
 
 ## License
 

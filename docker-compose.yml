@@ -1,8 +1,6 @@
 services:
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: ghcr.io/baoxinwen/hotsearch-monitor-backend:main
     container_name: hotsearch-backend
     restart: unless-stopped
     ports:
@@ -30,9 +28,7 @@ services:
       start_period: 15s
 
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+    image: ghcr.io/baoxinwen/hotsearch-monitor-frontend:main
     container_name: hotsearch-frontend
     restart: unless-stopped
     ports:
