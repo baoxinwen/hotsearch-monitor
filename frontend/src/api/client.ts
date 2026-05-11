@@ -84,6 +84,7 @@ export const API = {
 
   getHistoryDates: () => apiFetch('/api/history/dates'),
   getHistoryByDate: (date: string) => apiFetch(`/api/history/${date}`),
+  getSnapshotDetail: (snapshotId: string) => apiFetch(`/api/history/detail/${snapshotId}`),
 
   health: () => apiFetch('/health'),
 }

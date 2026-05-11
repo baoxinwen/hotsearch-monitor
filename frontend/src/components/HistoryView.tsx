@@ -1,18 +1,37 @@
 import React, { useState, useEffect } from 'react'
-import { Calendar, ChevronRight, Download } from 'lucide-react'
+import { Calendar, ChevronRight, Download, Loader2 } from 'lucide-react'
 import type { HistorySnapshot } from '../types'
 import { API } from '../api/client'
 import { PLATFORM_CONFIG, formatScore } from '../constants'
 
+interface SnapshotSummary {
+  id: string; timestamp: number; date: string; time: string
+  total_count: number; filtered_count: number; keywords: string[]
+}
+
 export function HistoryView() {
   const [dates, setDates] = useState<string[]>([])
   const [sel, setSel] = useState('')
-  const [snaps, setSnaps] = useState<HistorySnapshot[]>([])
+  const [snaps, setSnaps] = useState<SnapshotSummary[]>([])
   const [active, setActive] = useState<HistorySnapshot | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadingDetail, setLoadingDetail] = useState('')
 
   useEffect(() => { API.getHistoryDates().then((r: any) => { if (r.success) setDates(r.dates || []) }).catch(() => {}) }, [])
-  const load = async (d: string) => { setSel(d); setLoading(true); try { const r = await API.getHistoryByDate(d) as any; if (r.success) setSnaps(r.snapshots || []) } finally { setLoading(false) } }
+
+  const load = async (d: string) => {
+    setSel(d); setLoading(true); setActive(null)
+    try { const r = await API.getHistoryByDate(d) as any; if (r.success) setSnaps(r.snapshots || []) } finally { setLoading(false) }
+  }
+
+  const loadDetail = async (snap: SnapshotSummary) => {
+    setLoadingDetail(snap.id)
+    try {
+      const r = await API.getSnapshotDetail(snap.id) as any
+      if (r.success && r.snapshot) setActive(r.snapshot)
+    } finally { setLoadingDetail('') }
+  }
+
   const csv = (s: HistorySnapshot) => {
     const e = (x: string) => `"${(x||'').replace(/"/g,'""').replace(/[\r\n]+/g,' ')}"`
     let c = '﻿平台,排名,标题,热度,链接\n'
@@ -64,11 +83,12 @@ export function HistoryView() {
             {loading ? <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="skeleton h-12" />)}</div>
             : snaps.length===0 ? <p className="t-body text-center py-8" style={{ color: 'var(--c-ash)' }}>{sel?'该日期无快照':'请先选择日期'}</p>
             : <div className="space-y-0.5">{snaps.map(s => (
-                <button key={s.id} onClick={() => setActive(s)} className="w-full flex items-center justify-between px-3 py-3 rounded-p-sm transition-colors text-left"
+                <button key={s.id} onClick={() => loadDetail(s)} disabled={loadingDetail === s.id}
+                  className="w-full flex items-center justify-between px-3 py-3 rounded-p-sm transition-colors text-left disabled:opacity-50"
                   onMouseEnter={e => e.currentTarget.style.background='var(--c-surface-soft)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                   <div><div className="tnum" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--c-ink)' }}>{s.time}</div>
                     <div className="tnum t-caption">{s.total_count} 条 | {s.filtered_count} 匹配</div></div>
-                  <ChevronRight size={14} style={{ color: 'var(--c-ash)' }} />
+                  {loadingDetail === s.id ? <Loader2 size={14} className="animate-spin" style={{ color: 'var(--c-ash)' }} /> : <ChevronRight size={14} style={{ color: 'var(--c-ash)' }} />}
                 </button>))}</div>}
           </div>
         </div>

@@ -146,14 +146,22 @@ def _sync_email_config(user_config: dict):
 
 
 def _save_config(config: dict):
+    """保存配置到文件（SMTP 密码加密存储）"""
     config_dir = Path(__file__).parent.parent.parent / "config"
     config_dir.mkdir(exist_ok=True)
     config_path = config_dir / "user_config.json"
     tmp_path = config_path.with_suffix(".tmp")
+
+    # 写入前加密 smtp_password（内存中保持明文）
+    save_data = config.copy()
+    pwd = save_data.get("smtp_password", "")
+    if pwd and not pwd.startswith("gAAAAA"):  # gAAAAA 是 Fernet token 的固定前缀
+        save_data["smtp_password"] = encryption.encrypt(pwd)
+
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, ensure_ascii=False, indent=2)
-        tmp_path.replace(config_path)  # 原子替换
+            json.dump(save_data, f, ensure_ascii=False, indent=2)
+        tmp_path.replace(config_path)
     except Exception as e:
         logger.error(f"保存配置失败: {e}")
         try:
@@ -163,13 +171,17 @@ def _save_config(config: dict):
 
 
 def load_user_config() -> dict:
-    """加载用户配置"""
+    """加载用户配置（SMTP 密码自动解密）"""
     config_path = Path(__file__).parent.parent.parent / "config" / "user_config.json"
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             user_cfg = json.load(f)
         cfg = DEFAULT_USER_CONFIG.copy()
         cfg.update(user_cfg)
+        # 解密 smtp_password（兼容旧版明文存储）
+        pwd = cfg.get("smtp_password", "")
+        if pwd and pwd.startswith("gAAAAA"):
+            cfg["smtp_password"] = encryption.decrypt(pwd)
         return cfg
     except (FileNotFoundError, json.JSONDecodeError):
         return DEFAULT_USER_CONFIG.copy()

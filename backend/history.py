@@ -81,19 +81,40 @@ class HistoryManager:
                 dates.add(parts[1])
         return sorted(dates, reverse=True)
 
-    def get_snapshots(self, date: str) -> List[dict]:
-        """获取指定日期的快照列表"""
+    def get_snapshot_summaries(self, date: str) -> List[dict]:
+        """获取指定日期的快照摘要（不含完整数据，仅元信息）"""
         if not re.match(r'^\d{4}-\d{2}-\d{2}$', date):
             return []
 
-        snapshots = []
+        summaries = []
         for f in sorted(self.history_dir.glob(f"hotsearch_{date}_*.json")):
             try:
                 with open(f, "r", encoding="utf-8") as fh:
-                    snapshots.append(json.load(fh))
+                    snap = json.load(fh)
+                summaries.append({
+                    "id": snap.get("id"),
+                    "timestamp": snap.get("timestamp"),
+                    "date": snap.get("date"),
+                    "time": snap.get("time"),
+                    "total_count": snap.get("total_count", 0),
+                    "filtered_count": snap.get("filtered_count", 0),
+                    "keywords": snap.get("keywords", []),
+                })
             except Exception as e:
                 logger.warning(f"读取快照失败 {f.name}: {e}")
-        return snapshots
+        return summaries
+
+    def get_snapshot_detail(self, snapshot_id: str) -> Optional[dict]:
+        """获取单个快照的完整数据"""
+        if not re.match(r'^[a-f0-9-]{1,36}$', snapshot_id):
+            return None
+        for f in self.history_dir.glob(f"*_{snapshot_id}_*.json"):
+            try:
+                with open(f, "r", encoding="utf-8") as fh:
+                    return json.load(fh)
+            except Exception as e:
+                logger.warning(f"读取快照失败 {f.name}: {e}")
+        return None
 
     def delete_snapshot(self, snapshot_id: str) -> bool:
         """删除快照"""
