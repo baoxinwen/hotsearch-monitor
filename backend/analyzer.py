@@ -1,8 +1,9 @@
-"""中文趋势分析 - 来自 trendsentinel 的 NLP 分析逻辑，用 jieba 替代 segmentit"""
+"""中文趋势分析 - 用 jieba 分词 + 综合停用词表"""
 
 import re
 import logging
 from collections import Counter
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
@@ -11,33 +12,49 @@ logger = logging.getLogger(__name__)
 CUSTOM_TERMS = [
     "微博之夜", "星穹铁道", "ChatGPT", "原神", "崩坏3", "英雄联盟",
     "哔哩哔哩", "今日头条", "微信读书", "澎湃新闻", "少数派",
-    "特朗普", "拜登", "马斯克", "OpenAI", "DeepSeek",
+    "特朗普", "拜登", "马斯克", "OpenAI", "DeepSeek", "Claude",
     "春晚", "高考", "双十一", "奥运会", "世界杯",
-    "人工智能", "大模型", "新能源", "电动车",
+    "人工智能", "大模型", "新能源", "电动车", "AIGC", "AGI",
     "小米", "华为", "苹果", "三星", "特斯拉",
     "抖音", "快手", "小红书", "拼多多", "淘宝",
 ]
 
-# 停用词（来自 trendsentinel 的 stopwords.ts）
-STOP_WORDS = frozenset([
-    # 代词/疑问词
-    "我", "你", "他", "她", "它", "我们", "你们", "他们", "这", "那", "这个", "那个",
-    "谁", "什么", "哪", "哪里", "怎么", "为什么", "多少", "几",
-    # 副词
-    "很", "非常", "只", "都", "不", "没", "没有", "可能", "甚至", "已经", "就", "才",
-    "还", "又", "再", "也", "太", "挺", "更", "最", "比较", "特别",
-    # 介词/连词
-    "的", "了", "和", "与", "或", "但是", "但", "因为", "所以", "如果", "虽然", "尽管",
-    "在", "从", "到", "对", "把", "被", "让", "给", "向", "往", "以",
-    # 助词/语气词
-    "着", "过", "吧", "呢", "吗", "啊", "呀", "哦", "嗯", "哈",
-    # 量词
-    "个", "位", "些", "所有", "全部", "每", "各", "某",
-    # 趋势相关噪声
+# 热搜专用停用词（补充通用停用词表之外的噪声）
+_HOTSEARCH_STOP_WORDS = {
     "热搜", "头条", "新闻", "视频", "网友", "官方", "回应", "出现", "认为", "表示",
     "近日", "今天", "昨天", "明天", "真的", "男子", "女子", "发现", "发布", "公开",
     "首次", "最新", "突然", "刚刚", "紧急", "重磅", "震惊", "曝光", "揭秘",
-])
+    "话题", "引发", "关注", "热议", "讨论", "登上", "冲上", "榜一", "榜二",
+    "一个", "一种", "一些", "一次", "一部", "一场", "一条", "一起", "一样",
+    "不是", "可以", "已经", "还有", "就是", "这是", "那是", "也是", "都是",
+    "如何", "为什么", "怎么样", "什么样", "什么时候",
+    "等等", "——", "…", "...", "||", "｜",
+}
+
+
+def _load_stop_words() -> frozenset:
+    """加载停用词：外部文件（百度/哈工大等综合表）+ 热搜专用词"""
+    words = set(_HOTSEARCH_STOP_WORDS)
+
+    # 从文件加载综合停用词表
+    stopwords_file = Path(__file__).parent / "cn_stopwords.txt"
+    if stopwords_file.exists():
+        try:
+            with open(stopwords_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    w = line.strip()
+                    if w:
+                        words.add(w)
+            logger.info(f"已加载停用词表: {stopwords_file} ({len(words)} 词)")
+        except Exception as e:
+            logger.warning(f"加载停用词表失败: {e}")
+    else:
+        logger.warning(f"停用词表不存在: {stopwords_file}，仅使用内置词表")
+
+    return frozenset(words)
+
+
+STOP_WORDS = _load_stop_words()
 
 # 加载 jieba（延迟导入，未安装时降级处理）
 _jieba = None
@@ -80,24 +97,29 @@ def extract_keywords(items: List[dict], top_n: int = 20) -> List[Tuple[str, int]
             counter[term] += count
             remaining = remaining.replace(term, "")
 
-    # 第二步：清理文本
-    remaining = re.sub(r'[^一-鿿\w+#.]', ' ', remaining)
+    # 第二步：清理文本（只保留中文、字母、数字、#、+）
+    remaining = re.sub(r'[^一-鿿a-zA-Z0-9#+]', ' ', remaining)
 
     # 第三步：分词
     if _load_jieba():
         words = _jieba.lcut(remaining)
         for word in words:
             word = word.strip()
-            if len(word) > 1 and word not in STOP_WORDS and not word.isdigit():
+            # 过滤：长度>1、非停用词、非纯数字、非纯标点、非纯字母单字
+            if (len(word) > 1
+                and word not in STOP_WORDS
+                and not word.isdigit()
+                and not re.match(r'^[\W_]+$', word)
+                and not re.match(r'^[a-zA-Z]$', word)):
                 counter[word] += 1
     else:
         # 降级：简单的中文词组提取（2-4字）
         for length in range(4, 1, -1):
             for i in range(len(remaining) - length + 1):
                 chunk = remaining[i:i + length].strip()
-                if (len(chunk) > 1 and
-                    all('一' <= c <= '鿿' for c in chunk) and
-                    chunk not in STOP_WORDS):
+                if (len(chunk) > 1
+                    and all('一' <= c <= '鿿' for c in chunk)
+                    and chunk not in STOP_WORDS):
                     counter[chunk] += 1
 
     return counter.most_common(top_n)

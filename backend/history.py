@@ -108,7 +108,7 @@ class HistoryManager:
         """获取单个快照的完整数据"""
         if not re.match(r'^[a-f0-9-]{1,36}$', snapshot_id):
             return None
-        for f in self.history_dir.glob(f"*_{snapshot_id}_*.json"):
+        for f in self.history_dir.glob(f"*_{snapshot_id}.json"):
             try:
                 with open(f, "r", encoding="utf-8") as fh:
                     return json.load(fh)
@@ -120,7 +120,7 @@ class HistoryManager:
         """删除快照"""
         if not re.match(r'^[a-f0-9-]{1,36}$', snapshot_id):
             return False
-        for f in self.history_dir.glob(f"*_{snapshot_id}_*.json"):
+        for f in self.history_dir.glob(f"*_{snapshot_id}.json"):
             try:
                 f.unlink()
                 return True

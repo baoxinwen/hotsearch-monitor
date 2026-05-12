@@ -44,3 +44,8 @@ desktop.ini
 .claude/
 CLAUDE.md
 DESIGN.md
+
+# 测试（本地开发用）
+test/
+frontend/src/test/
+frontend/vitest.config.ts

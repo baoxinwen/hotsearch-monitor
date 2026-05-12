@@ -12,13 +12,14 @@ def filter_by_keywords(data: Dict[str, List[dict]], keywords: List[str]) -> Dict
         return {}
 
     filtered = {}
+    keywords_lower = [kw.lower() for kw in keywords]
     for platform, items in data.items():
         if not isinstance(items, list):
             continue
         matched = [item for item in items
                    if isinstance(item, dict)
                    and item.get("title")
-                   and any(kw in item["title"] for kw in keywords)]
+                   and any(kw in item["title"].lower() for kw in keywords_lower)]
         if matched:
             filtered[platform] = matched
 
