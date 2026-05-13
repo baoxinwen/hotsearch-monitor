@@ -37,7 +37,7 @@ export function EmailModal({ config, onUpdate }: Props) {
   const msgCls = (s: string) => ({ fontSize: '12px', padding: '8px 12px', borderRadius: 8, marginTop: 8, background: s==='ok'?'#d9f3e1':'#fde0ec', color: s==='ok'?'#1aae39':'#cd4239' })
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <h2 className="t-heading mb-4">推送设置</h2>
       <div className="card p-5 space-y-5">
         {/* Email toggle */}

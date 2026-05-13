@@ -20,7 +20,7 @@ export function SettingsModal({ config, onUpdate }: Props) {
   const save = async () => { setSs('s'); try { const k = kw.split('\n').map(x=>x.trim()).filter(Boolean); const all = ALL.length>0 && ALL.every(p=>plats.includes(p)); await onUpdate({ keywords: k, platforms: all?[]:plats, update_interval: interval }); setSs('ok'); setTimeout(()=>setSs('idle'),2000) } catch { setSs('err'); setTimeout(()=>setSs('idle'),3000) } }
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <h2 className="t-heading mb-4">监控设置</h2>
       <div className="space-y-4">
         <div className="card p-5"><h3 className="t-label">监控关键词</h3><p className="t-helper mb-3">每行一个关键词，热搜标题包含任一关键词将被筛选</p>

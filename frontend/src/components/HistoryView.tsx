@@ -65,7 +65,7 @@ export function HistoryView() {
   )
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <h2 className="t-heading mb-6">历史快照</h2>
       {dates.length === 0 ? <div className="text-center py-20"><p className="t-body" style={{ color: 'var(--c-ash)' }}>暂无历史快照</p></div> : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

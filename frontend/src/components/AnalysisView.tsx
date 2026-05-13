@@ -154,7 +154,7 @@ export function AnalysisView({ onTermClick, isDark, selectedPlatforms }: Analysi
     : 0
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="t-heading">趋势分析</h2>
@@ -202,12 +202,12 @@ export function AnalysisView({ onTermClick, isDark, selectedPlatforms }: Analysi
             }))} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--c-hair-soft)" />
               <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--c-ash)' }} />
-              <YAxis yAxisId="left" tick={{ fontSize: 11, fill: '#f7a501' }} label={{ value: '条目数', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#f7a501' } }} />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: '#2c84e0' }} label={{ value: '平均热度', angle: 90, position: 'insideRight', style: { fontSize: 11, fill: '#2c84e0' } }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11, fill: 'var(--c-ash)' }} label={{ value: '条目数', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'var(--c-ash)' } }} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: 'var(--c-ash)' }} label={{ value: '平均热度', angle: 90, position: 'insideRight', style: { fontSize: 11, fill: 'var(--c-ash)' } }} />
               <Tooltip content={<ChartTooltip />} />
               <Legend wrapperStyle={{ fontSize: 12, color: 'var(--c-mute)' }} />
               <Bar yAxisId="left" dataKey="count" name="条目数" fill="#f7a501" radius={[4, 4, 0, 0]} animationDuration={800} cursor="pointer" />
-              <Bar yAxisId="right" dataKey="avg_score" name="平均热度" fill="#2c84e0" radius={[4, 4, 0, 0]} animationDuration={800} cursor="pointer" />
+              <Bar yAxisId="right" dataKey="avg_score" name="平均热度" fill="#e07830" radius={[4, 4, 0, 0]} animationDuration={800} cursor="pointer" />
             </BarChart>
           </ResponsiveContainer>
         </div>

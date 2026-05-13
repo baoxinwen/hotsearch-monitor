@@ -38,7 +38,7 @@ class HistoryManager:
         try:
             now = datetime.now()
             date_str = now.strftime("%Y-%m-%d")
-            time_str = now.strftime("%H-%M-%S")
+            time_str = now.strftime("%H:%M:%S")
             snapshot_id = str(uuid.uuid4())[:8]
             filename = f"hotsearch_{date_str}_{time_str}_{snapshot_id}.json"
 
