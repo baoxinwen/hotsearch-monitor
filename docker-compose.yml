@@ -9,7 +9,9 @@ services:
       - ./data:/app/data
       - ./config:/app/config
       - ./logs:/app/logs
+      - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro
     environment:
+      - TZ=Asia/Shanghai
       - DEBUG=${DEBUG:-false}
       - API_KEY=${API_KEY:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-}

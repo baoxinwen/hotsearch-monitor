@@ -38,7 +38,7 @@ class HistoryManager:
         try:
             now = datetime.now()
             date_str = now.strftime("%Y-%m-%d")
-            time_str = now.strftime("%H:%M:%S")
+            time_str = now.strftime("%H-%M-%S")
             snapshot_id = str(uuid.uuid4())[:8]
             filename = f"hotsearch_{date_str}_{time_str}_{snapshot_id}.json"
 
@@ -95,7 +95,7 @@ class HistoryManager:
                     "id": snap.get("id"),
                     "timestamp": snap.get("timestamp"),
                     "date": snap.get("date"),
-                    "time": snap.get("time"),
+                    "time": snap.get("time", "").replace("-", ":"),
                     "total_count": snap.get("total_count", 0),
                     "filtered_count": snap.get("filtered_count", 0),
                     "keywords": snap.get("keywords", []),
@@ -111,7 +111,9 @@ class HistoryManager:
         for f in self.history_dir.glob(f"*_{snapshot_id}.json"):
             try:
                 with open(f, "r", encoding="utf-8") as fh:
-                    return json.load(fh)
+                    snap = json.load(fh)
+                    snap["time"] = snap.get("time", "").replace("-", ":")
+                    return snap
             except Exception as e:
                 logger.warning(f"读取快照失败 {f.name}: {e}")
         return None
