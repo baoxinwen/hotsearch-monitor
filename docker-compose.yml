@@ -14,6 +14,7 @@ services:
       - TZ=Asia/Shanghai
       - DEBUG=${DEBUG:-false}
       - API_KEY=${API_KEY:-}
+      - UAPI_API_KEY=${UAPI_API_KEY:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-}
       - HISTORY_ENABLED=${HISTORY_ENABLED:-true}
       - HISTORY_RETENTION_DAYS=${HISTORY_RETENTION_DAYS:-7}

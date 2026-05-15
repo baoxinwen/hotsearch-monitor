@@ -31,10 +31,18 @@ class Settings(BaseSettings):
 
     # UApiPro
     uapi_base_url: str = Field(default="https://uapis.cn/api/v1/misc/hotboard", alias="UAPI_BASE_URL")
+    uapi_api_key: str = Field(default="", alias="UAPI_API_KEY")  # 多个 key 逗号分隔
     api_timeout: int = Field(default=15, alias="API_TIMEOUT")
     api_max_workers: int = Field(default=10, alias="API_MAX_WORKERS")
     api_max_retries: int = Field(default=3, alias="API_MAX_RETRIES")
     api_retry_delay: float = Field(default=1.0, alias="API_RETRY_DELAY")
+
+    @property
+    def uapi_api_keys(self) -> List[str]:
+        """解析逗号分隔的多个 API Key"""
+        if not self.uapi_api_key:
+            return []
+        return [k.strip() for k in self.uapi_api_key.split(",") if k.strip()]
 
     # 缓存
     cache_ttl: int = Field(default=60, alias="CACHE_TTL")

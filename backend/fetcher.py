@@ -25,12 +25,52 @@ class HotSearchFetcher:
         self._failure_counts: Dict[str, int] = {}
         self._disabled_platforms: set = set()
         self._client: httpx.AsyncClient | None = None
+        # API Key 轮换池
+        self._key_index: int = 0
+        self._exhausted_keys: set = set()  # 本月额度用尽的 key
 
     async def _get_client(self) -> httpx.AsyncClient:
         """复用 httpx 客户端，避免每次请求新建连接池"""
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(timeout=self.settings.api_timeout)
         return self._client
+
+    def _get_next_key(self) -> str:
+        """从 key 池中获取下一个可用 key（轮换）"""
+        keys = self.settings.uapi_api_keys
+        if not keys:
+            return ""
+        # 跳过已耗尽的 key，尝试所有 key
+        for _ in range(len(keys)):
+            key = keys[self._key_index % len(keys)]
+            self._key_index += 1
+            if key not in self._exhausted_keys:
+                return key
+        # 所有 key 都耗尽，重置并从头开始（允许重试）
+        self._exhausted_keys.clear()
+        self._key_index = 0
+        return keys[0]
+
+    def _is_quota_error(self, data: dict) -> bool:
+        """检查 API 响应是否为额度耗尽错误"""
+        error_code = data.get("code", data.get("error", ""))
+        return "QUOTA" in str(error_code).upper() or "EXHAUSTED" in str(error_code).upper()
+
+    def _mark_key_exhausted(self, key: str):
+        """标记 key 额度耗尽"""
+        if key:
+            self._exhausted_keys.add(key)
+            logger.warning(f"API Key ...{key[-6:]} 额度耗尽，已跳过")
+
+    def get_cache_stats(self) -> dict:
+        keys = self.settings.uapi_api_keys
+        return {
+            "cached_platforms": len(self._cache),
+            "disabled_platforms": list(self._disabled_platforms),
+            "failure_counts": dict(self._failure_counts),
+            "api_keys_total": len(keys),
+            "api_keys_exhausted": len(self._exhausted_keys),
+        }
 
     def _is_cached(self, platform: str) -> bool:
         if platform not in self._cache:
@@ -49,15 +89,8 @@ class HotSearchFetcher:
         else:
             self._cache.clear()
 
-    def get_cache_stats(self) -> dict:
-        return {
-            "cached_platforms": len(self._cache),
-            "disabled_platforms": list(self._disabled_platforms),
-            "failure_counts": dict(self._failure_counts),
-        }
-
     async def fetch_platform(self, platform: str, force_refresh: bool = False) -> Tuple[List[dict], str]:
-        """获取单个平台热搜"""
+        """获取单个平台热搜（支持 Key 池轮换）"""
         if platform not in PLATFORM_CONFIG:
             return [], f"不支持的平台: {platform}"
 
@@ -70,17 +103,26 @@ class HotSearchFetcher:
         platform_info = PLATFORM_CONFIG[platform]
         platform_name = platform_info["name"]
         url = f"{self.settings.uapi_base_url}?type={platform}"
-        headers = {"User-Agent": "Mozilla/5.0 (compatible; HotSearchMonitor/1.0)"}
+        base_headers = {"User-Agent": "Mozilla/5.0 (compatible; HotSearchMonitor/1.0)"}
 
         last_error = ""
         client = await self._get_client()
+
         for attempt in range(self.settings.api_max_retries):
+            # 每次重试都获取下一个 key
+            current_key = self._get_next_key()
+            headers = {**base_headers}
+            if current_key:
+                headers["Authorization"] = f"Bearer {current_key}"
+
             try:
                 resp = await client.get(url, headers=headers)
 
+                # 429 限流 → 标记当前 key 耗尽，换 key 重试
                 if resp.status_code == 429:
-                    delay = (attempt + 1) * 1.5 + random.uniform(0, 0.5)
-                    logger.warning(f"{platform_name}: 429 rate limit, retry in {delay:.1f}s ({attempt+1}/{self.settings.api_max_retries})")
+                    self._mark_key_exhausted(current_key)
+                    delay = random.uniform(0.5, 1.5)
+                    logger.warning(f"{platform_name}: 429 限流，切换 Key 重试 ({attempt+1}/{self.settings.api_max_retries})")
                     await asyncio.sleep(delay)
                     continue
 
@@ -95,6 +137,14 @@ class HotSearchFetcher:
                     break
 
                 data = resp.json()
+
+                # 检查响应体中的额度耗尽错误
+                if self._is_quota_error(data):
+                    self._mark_key_exhausted(current_key)
+                    logger.warning(f"{platform_name}: API 返回额度耗尽，切换 Key 重试")
+                    await asyncio.sleep(random.uniform(0.5, 1.5))
+                    continue
+
                 items = self._parse_response(data, platform, platform_info)
 
                 self._cache[platform] = {"data": items, "timestamp": time.time()}
