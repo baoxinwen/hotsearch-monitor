@@ -1,45 +1,43 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { getStorageItem, setStorageItem, STORAGE_KEYS } from '../utils/storage'
 
-export type Theme = 'dark' | 'light' | 'system'
-const STORAGE_KEY = 'hotsearch_monitor_theme'
-
-function readStored(): Theme {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return 'dark' // 首次使用默认深色
-    const v = JSON.parse(raw)
-    return v === 'dark' || v === 'light' || v === 'system' ? v : 'dark'
-  } catch {
-    return 'dark'
-  }
-}
-
-function apply(theme: Theme): boolean {
-  const dark = theme === 'dark' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
-  document.documentElement.classList.toggle('dark', dark)
-  return dark
-}
+type Theme = 'dark' | 'light' | 'system'
 
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>(readStored)
-  const [isDark, setIsDark] = useState<boolean>(() => apply(readStored()))
+  const [theme, setThemeState] = useState<Theme>(() =>
+    getStorageItem(STORAGE_KEYS.THEME, 'system')
+  )
+  const [systemDark, setSystemDark] = useState(() =>
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  )
 
-  // 跟随系统的实时监听
+  // 监听系统主题变化
   useEffect(() => {
     if (theme !== 'system') return
-    const mq = matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => setIsDark(apply('system'))
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
   }, [theme])
 
-  const setTheme = useCallback((t: Theme) => {
+  const isDark = useMemo(() =>
+    theme === 'dark' || (theme === 'system' && systemDark),
+    [theme, systemDark]
+  )
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (isDark) {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
+  }, [isDark])
+
+  const setTheme = (t: Theme) => {
     setThemeState(t)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(t))
-    setIsDark(apply(t))
-  }, [])
+    setStorageItem(STORAGE_KEYS.THEME, t)
+  }
 
-  const toggle = useCallback(() => setTheme(isDark ? 'light' : 'dark'), [isDark, setTheme])
-
-  return { theme, isDark, setTheme, toggle }
+  return { theme, isDark, setTheme }
 }
