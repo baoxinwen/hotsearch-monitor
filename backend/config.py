@@ -73,7 +73,8 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         if not self.cors_origins:
-            return ["http://localhost:5173", "http://localhost:8000"] if self.debug else []
+            # 开发模式允许 localhost，生产模式允许所有（同源部署时不影响安全）
+            return ["http://localhost:5173", "http://localhost:8000"] if self.debug else ["*"]
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 

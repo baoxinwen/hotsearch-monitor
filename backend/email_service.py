@@ -80,17 +80,13 @@ class EmailService:
         self._runtime_config: dict = {}
 
     def update_smtp_config(self, config: dict):
-        """更新SMTP运行时配置（来自用户JSON配置）"""
-        if config.get("smtp_host"):
-            self._runtime_config["smtp_host"] = config["smtp_host"]
-        if config.get("smtp_port"):
-            self._runtime_config["smtp_port"] = int(config["smtp_port"])
-        if config.get("smtp_user"):
-            self._runtime_config["smtp_user"] = config["smtp_user"]
-        if config.get("smtp_password"):
-            self._runtime_config["smtp_password"] = config["smtp_password"]
-        if config.get("mail_from"):
-            self._runtime_config["mail_from"] = config["mail_from"]
+        """更新SMTP运行时配置（来自用户JSON配置）。空值会清除对应键，使环境变量回退生效。"""
+        for key in ("smtp_host", "smtp_port", "smtp_user", "smtp_password", "mail_from"):
+            val = config.get(key)
+            if val:
+                self._runtime_config[key] = int(val) if key == "smtp_port" else val
+            else:
+                self._runtime_config.pop(key, None)
 
     def _cfg(self, key: str, default=""):
         """获取配置项，运行时配置优先于环境变量"""
@@ -212,7 +208,10 @@ class EmailService:
         sender = self._get_sender()
         login_user = self._get_login_user()
         smtp_host = self._cfg("smtp_host", "smtp.163.com")
-        smtp_port = int(self._cfg("smtp_port", 465))
+        try:
+            smtp_port = int(self._cfg("smtp_port", 465))
+        except (ValueError, TypeError):
+            smtp_port = 465
         smtp_password = self._cfg("smtp_password")
 
         msg = MIMEMultipart("alternative")
@@ -224,9 +223,9 @@ class EmailService:
         logger.info(f"SMTP连接: {smtp_host}:{smtp_port}, 用户: {login_user}")
 
         if smtp_port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, smtp_port)
+            server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
         else:
-            server = smtplib.SMTP(smtp_host, smtp_port)
+            server = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
             server.starttls()
 
         with server:

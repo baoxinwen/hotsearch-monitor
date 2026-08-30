@@ -3,6 +3,7 @@
 import asyncio
 import ipaddress
 import logging
+import socket
 from datetime import datetime
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
@@ -117,16 +118,28 @@ def _validate_webhook_url(url: str) -> Optional[str]:
     if not hostname:
         return "URL 缺少主机名"
 
-    # 阻止访问内网/元数据地址
+    # 直接是 IP 的情况
     try:
         ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local:
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast:
             return "不允许访问内网地址"
+        return None
     except ValueError:
-        # hostname 是域名，检查常见内网域名
-        blocked = ("localhost", "127.0.0.1", "0.0.0.0", "169.254.169.254", "metadata.google.internal")
-        if hostname in blocked:
-            return "不允许访问内网地址"
+        pass
+
+    # hostname 是域名，解析后检查 IP（防止 DNS 重绑定和 nip.io 等服务）
+    blocked_names = ("localhost", "metadata.google.internal", "169.254.169.254")
+    if hostname in blocked_names:
+        return "不允许访问内网地址"
+
+    try:
+        resolved_ips = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for _, _, _, _, sockaddr in resolved_ips:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast:
+                return f"不允许访问内网地址 ({hostname} 解析到 {ip})"
+    except (socket.gaierror, OSError):
+        return "无法解析域名"
 
     return None
 

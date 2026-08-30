@@ -75,15 +75,16 @@ async def get_trending_keywords(
             all_items.extend(cached)
             cached_count += 1
 
-    # 如果缓存不足，使用后台任务的数据
+    # 如果缓存不足，使用后台任务的数据（尊重平台筛选）
     if cached_count < len(platform_list) // 2:
         app_data = getattr(request.app.state, "latest_data", {})
         if app_data:
             all_items = []
-            for items in app_data.values():
+            for p in platform_list:
+                items = app_data.get(p)
                 if isinstance(items, list):
                     all_items.extend(items)
-            cached_count = len([p for p, items in app_data.items() if items])
+            cached_count = len([p for p in platform_list if app_data.get(p)])
 
     keywords = extract_keywords(all_items, top_n)
 

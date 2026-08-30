@@ -72,16 +72,19 @@ async def test_email(request: Request):
         # 如果前端传了 SMTP 配置（用户未保存就点测试），临时更新邮件服务
         from routes.config import SMTP_FIELDS
         smtp_from_body = {k: body[k] for k in SMTP_FIELDS if k in body and body[k]}
-        if smtp_from_body:
-            email_service.update_smtp_config(smtp_from_body)
-            logger.info(f"使用表单SMTP配置测试: {list(smtp_from_body.keys())}")
-        else:
-            # 否则同步已保存的配置
-            from routes.config import _sync_email_config
-            _sync_email_config(request.app.state.user_config)
+        saved_runtime = dict(email_service._runtime_config)  # 备份
+        try:
+            if smtp_from_body:
+                email_service.update_smtp_config(smtp_from_body)
+                logger.info(f"使用表单SMTP配置测试: {list(smtp_from_body.keys())}")
+            else:
+                from routes.config import _sync_email_config
+                _sync_email_config(request.app.state.user_config)
 
-        logger.info(f"发送测试邮件到: {recipient}")
-        return await email_service.send_test(recipient)
+            logger.info(f"发送测试邮件到: {recipient}")
+            return await email_service.send_test(recipient)
+        finally:
+            email_service._runtime_config = saved_runtime  # 恢复，避免污染全局
     except Exception as e:
         logger.error(f"测试邮件异常: {type(e).__name__}: {e}", exc_info=True)
         return {"success": False, "message": f"发送失败: {type(e).__name__}: {e}"}

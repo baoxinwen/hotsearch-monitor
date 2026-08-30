@@ -86,7 +86,7 @@ async def background_update(app):
             if platforms:
                 logger.info(f"后台更新: {len(platforms)} 个平台")
                 data, errors = await fetcher.fetch_multiple(platforms, force_refresh=True)
-                filtered = filter_by_keywords(data, keywords) if keywords else {}
+                filtered = filter_by_keywords(data, keywords) if keywords else data  # 无关键词时用全部数据
 
                 # 保存快照
                 history_manager.save_snapshot(data, filtered, errors, keywords)
@@ -114,6 +114,8 @@ async def background_email(app):
     logger = logging.getLogger("scheduler")
     await asyncio.sleep(10)
 
+    last_sent_key = None  # 防止重复发送: "frequency_hour_minute"
+
     while True:
         try:
             user_config = app.state.user_config
@@ -126,9 +128,10 @@ async def background_email(app):
                 send_time = user_config.get("email_time", "09:00")
                 frequency = user_config.get("email_frequency", "daily")
 
-                should_send = False
                 hour, minute = map(int, send_time.split(":"))
+                sent_key = f"{frequency}_{now.hour}_{now.minute}_{now.weekday()}"
 
+                should_send = False
                 if frequency == "hourly" and now.minute == minute:
                     should_send = True
                 elif frequency == "daily" and now.hour == hour and now.minute == minute:
@@ -136,10 +139,14 @@ async def background_email(app):
                 elif frequency == "weekly" and now.weekday() == 0 and now.hour == hour and now.minute == minute:
                     should_send = True
 
+                # 防止同一分钟内重复发送
+                if should_send and sent_key == last_sent_key:
+                    should_send = False
+
                 if should_send:
+                    last_sent_key = sent_key
                     logger.info(f"定时推送触发: {frequency} at {send_time}")
                     data = getattr(app.state, "latest_data", {})
-                    filtered = getattr(app.state, "latest_filtered", {})
                     keywords = user_config.get("keywords", [])
 
                     if not data:
@@ -147,35 +154,35 @@ async def background_email(app):
                         from config import PLATFORM_CONFIG
                         platforms = user_config.get("platforms") or list(PLATFORM_CONFIG.keys())
                         data, _ = await fetcher.fetch_multiple(platforms)
+
+                    if not data:
+                        logger.warning("定时推送跳过: 无可用数据")
+                    else:
                         filtered = filter_by_keywords(data, keywords) if keywords else data
+                        report_data = filtered if keywords else data
 
-                    # 有关键词时用过滤结果（即使为空），无关键词时用全部数据
-                    report_data = filtered if keywords else data
+                        if email_enabled:
+                            await email_service.send_report(
+                                recipients=user_config["email_to"],
+                                data=report_data,
+                                keywords=keywords,
+                                frequency=frequency,
+                            )
 
-                    # 发送邮件
-                    if email_enabled:
-                        await email_service.send_report(
-                            recipients=user_config["email_to"],
-                            data=report_data,
-                            keywords=keywords,
-                            frequency=frequency,
-                        )
-
-                    # 发送 Webhook
-                    if webhook_enabled:
-                        from webhook_service import webhook_service
-                        await webhook_service.send(
-                            url=user_config["webhook_url"],
-                            webhook_type=user_config.get("webhook_type", "generic"),
-                            data=report_data,
-                            keywords=keywords,
-                            frequency=frequency,
-                        )
+                        if webhook_enabled:
+                            from webhook_service import webhook_service
+                            await webhook_service.send(
+                                url=user_config["webhook_url"],
+                                webhook_type=user_config.get("webhook_type", "generic"),
+                                data=report_data,
+                                keywords=keywords,
+                                frequency=frequency,
+                            )
 
         except Exception as e:
             logger.error(f"定时推送失败: {e}")
 
-        await asyncio.sleep(60)  # 每分钟检查一次
+        await asyncio.sleep(60)
 
 
 # ==================== 生命周期 ====================

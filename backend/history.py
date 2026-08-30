@@ -25,6 +25,7 @@ class HistoryManager:
         self.max_snapshots = settings.max_history_snapshots
         self.history_dir = Path(data_dir) if data_dir else Path(__file__).parent.parent / "data" / "history"
         self.history_dir.mkdir(parents=True, exist_ok=True)
+        self._save_count = 0
 
     def save_snapshot(self, data: Dict[str, List[dict]],
                       filtered_data: Dict[str, List[dict]],
@@ -62,7 +63,9 @@ class HistoryManager:
                 json.dump(snapshot, f, ensure_ascii=False, indent=2)
 
             logger.info(f"已保存历史快照: {filename}")
-            self._cleanup()
+            self._save_count += 1
+            if self._save_count % 10 == 0:
+                self._cleanup()
             return snapshot_id
 
         except Exception as e:

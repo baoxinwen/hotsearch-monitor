@@ -62,7 +62,13 @@ async def update_config(request: Request):
     # SMTP配置
     for field in SMTP_FIELDS:
         if field in body:
-            user_config[field] = str(body[field]).strip() if body[field] else ""
+            val = str(body[field]).strip() if body[field] else ""
+            if field == "smtp_port" and val:
+                try:
+                    val = str(int(val))
+                except (ValueError, TypeError):
+                    continue
+            user_config[field] = val
 
     # Webhook配置
     if "webhook_enabled" in body:
@@ -143,11 +149,17 @@ def _save_config(config: dict):
     config_dir = Path(__file__).parent.parent.parent / "config"
     config_dir.mkdir(exist_ok=True)
     config_path = config_dir / "user_config.json"
+    tmp_path = config_path.with_suffix(".tmp")
     try:
-        with open(config_path, "w", encoding="utf-8") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
+        tmp_path.replace(config_path)  # 原子替换
     except Exception as e:
         logger.error(f"保存配置失败: {e}")
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def load_user_config() -> dict:

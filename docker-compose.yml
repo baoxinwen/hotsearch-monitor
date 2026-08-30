@@ -13,11 +13,6 @@ services:
       - DEBUG=${DEBUG:-false}
       - API_KEY=${API_KEY:-}
       - CORS_ORIGINS=${CORS_ORIGINS:-}
-      - SMTP_HOST=${SMTP_HOST:-smtp.163.com}
-      - SMTP_PORT=${SMTP_PORT:-465}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - MAIL_FROM=${MAIL_FROM:-}
       - HISTORY_ENABLED=${HISTORY_ENABLED:-true}
       - HISTORY_RETENTION_DAYS=${HISTORY_RETENTION_DAYS:-7}
     healthcheck:

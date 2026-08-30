@@ -92,7 +92,7 @@ async def refresh_platform(request: Request, platform: str):
 
     data, error = await fetcher.fetch_platform(platform, force_refresh=True)
     return {
-        "success": True,
+        "success": not error,
         "data": data,
         "error": error,
         "update_time": time.strftime("%Y-%m-%d %H:%M:%S"),

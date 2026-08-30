@@ -71,26 +71,20 @@ npm run dev
 |------|--------|------|
 | `DEBUG` | `false` | 开发模式 |
 | `API_KEY` | 空 | API Key 认证（可选） |
-| `SMTP_HOST` | `smtp.163.com` | SMTP 服务器 |
-| `SMTP_PORT` | `465` | SMTP 端口（465=SSL，587=STARTTLS） |
-| `SMTP_USER` | 空 | SMTP 用户名 |
-| `SMTP_PASSWORD` | 空 | SMTP 密码/授权码 |
+| `CORS_ORIGINS` | 空 | CORS 来源（逗号分隔） |
 | `HISTORY_ENABLED` | `true` | 启用历史快照 |
 | `HISTORY_RETENTION_DAYS` | `7` | 快照保留天数 |
 | `BACKEND_PORT` | `8000` | 后端端口映射 |
 | `FRONTEND_PORT` | `80` | 前端端口映射 |
 
+> SMTP 和 Webhook 配置通过 Web 界面的「设置 → 推送设置」页面配置，不通过环境变量。
+
 ### 运行时配置
 
-通过 Web 界面的「设置」页面配置：
+通过 Web 界面的「设置」页面配置，保存在 `config/user_config.json`：
 
-- 监控关键词（每行一个）
-- 监控平台选择（48+ 平台）
-- 更新间隔
-- 邮件推送（收件人、频率、SMTP 配置）
-- Webhook 推送（URL、类型：企业微信/钉钉/飞书）
-
-配置保存在 `config/user_config.json`。
+- **监控设置**：关键词、平台选择、更新间隔
+- **推送设置**：SMTP 邮件（服务器/用户名/密码/收件人/频率）、Webhook（企微/钉钉/飞书）
 
 ## API 端点
 

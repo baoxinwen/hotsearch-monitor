@@ -24,6 +24,13 @@ class HotSearchFetcher:
         self._cache: Dict[str, dict] = {}  # {platform: {data, timestamp}}
         self._failure_counts: Dict[str, int] = {}
         self._disabled_platforms: set = set()
+        self._client: httpx.AsyncClient | None = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """复用 httpx 客户端，避免每次请求新建连接池"""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self.settings.api_timeout)
+        return self._client
 
     def _is_cached(self, platform: str) -> bool:
         if platform not in self._cache:
@@ -66,50 +73,49 @@ class HotSearchFetcher:
         headers = {"User-Agent": "Mozilla/5.0 (compatible; HotSearchMonitor/1.0)"}
 
         last_error = ""
-        async with httpx.AsyncClient(timeout=self.settings.api_timeout) as client:
-            for attempt in range(self.settings.api_max_retries):
-                try:
-                    resp = await client.get(url, headers=headers)
+        client = await self._get_client()
+        for attempt in range(self.settings.api_max_retries):
+            try:
+                resp = await client.get(url, headers=headers)
 
-                    if resp.status_code == 429:
-                        delay = (attempt + 1) * 1.5 + random.uniform(0, 0.5)
-                        logger.warning(f"{platform_name}: 429 rate limit, retry in {delay:.1f}s ({attempt+1}/{self.settings.api_max_retries})")
-                        await asyncio.sleep(delay)
-                        continue
-
-                    if resp.status_code >= 500:
-                        delay = (attempt + 1) * self.settings.api_retry_delay
-                        logger.warning(f"{platform_name}: HTTP {resp.status_code}, retry in {delay:.1f}s")
-                        await asyncio.sleep(delay)
-                        continue
-
-                    if resp.status_code >= 400:
-                        last_error = f"HTTP {resp.status_code}"
-                        break
-
-                    data = resp.json()
-                    items = self._parse_response(data, platform, platform_info)
-
-                    # 更新缓存
-                    self._cache[platform] = {"data": items, "timestamp": time.time()}
-                    self._failure_counts.pop(platform, None)
-
-                    logger.info(f"{platform_name}: 获取 {len(items)} 条热搜")
-                    return items, ""
-
-                except httpx.TimeoutException:
-                    last_error = "请求超时"
-                    delay = (attempt + 1) * self.settings.api_retry_delay
-                    logger.warning(f"{platform_name}: timeout, retry in {delay:.1f}s")
+                if resp.status_code == 429:
+                    delay = (attempt + 1) * 1.5 + random.uniform(0, 0.5)
+                    logger.warning(f"{platform_name}: 429 rate limit, retry in {delay:.1f}s ({attempt+1}/{self.settings.api_max_retries})")
                     await asyncio.sleep(delay)
-                except httpx.ConnectError:
-                    last_error = "连接失败"
+                    continue
+
+                if resp.status_code >= 500:
                     delay = (attempt + 1) * self.settings.api_retry_delay
+                    logger.warning(f"{platform_name}: HTTP {resp.status_code}, retry in {delay:.1f}s")
                     await asyncio.sleep(delay)
-                except Exception as e:
-                    last_error = str(e)
-                    logger.error(f"{platform_name}: unexpected error: {e}")
+                    continue
+
+                if resp.status_code >= 400:
+                    last_error = f"HTTP {resp.status_code}"
                     break
+
+                data = resp.json()
+                items = self._parse_response(data, platform, platform_info)
+
+                self._cache[platform] = {"data": items, "timestamp": time.time()}
+                self._failure_counts.pop(platform, None)
+
+                logger.info(f"{platform_name}: 获取 {len(items)} 条热搜")
+                return items, ""
+
+            except httpx.TimeoutException:
+                last_error = "请求超时"
+                delay = (attempt + 1) * self.settings.api_retry_delay
+                logger.warning(f"{platform_name}: timeout, retry in {delay:.1f}s")
+                await asyncio.sleep(delay)
+            except httpx.ConnectError:
+                last_error = "连接失败"
+                delay = (attempt + 1) * self.settings.api_retry_delay
+                await asyncio.sleep(delay)
+            except Exception as e:
+                last_error = str(e)
+                logger.error(f"{platform_name}: unexpected error: {e}")
+                break
 
         # 失败处理
         logger.error(f"{platform_name}: 所有重试失败 - {last_error}")
@@ -164,7 +170,7 @@ class HotSearchFetcher:
                 hot_raw = item.get("value")
             if hot_raw is None:
                 hot_raw = ""
-            score = parse_score(hot_raw) if hot_raw else 0
+            score = parse_score(hot_raw) if hot_raw is not None else 0
 
             # URL：优先API返回，否则用模板（避免 format 注入）
             item_url = item.get("url") or item.get("link") or item.get("mobileUrl") or ""
@@ -184,7 +190,7 @@ class HotSearchFetcher:
                 "platform": platform,
                 "url": item_url,
                 "category": platform_info.get("category", ""),
-                "hot_display": str(hot_raw) if hot_raw else "",
+                "hot_display": str(hot_raw) if hot_raw is not None and hot_raw != "" else "",
                 "timestamp": int(time.time() * 1000),
             })
 
