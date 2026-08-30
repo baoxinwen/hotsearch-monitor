@@ -48,3 +48,6 @@ DESIGN.md
 # 本地临时目录
 test/
 .ui-screenshots/
+
+# ZCode CLI 本地产物
+.zcode/
