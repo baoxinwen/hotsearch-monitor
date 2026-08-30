@@ -99,6 +99,8 @@ DEFAULT_USER_CONFIG = {
     "webhook_enabled": False,
     "webhook_url": "",
     "webhook_type": "generic",  # generic / wechat / dingtalk / feishu
+    "stop_words": [],        # 用户自定义停用词（关键词分析时排除）
+    "min_term_length": 2,    # 关键词最小长度（过滤分词碎片）
 }
 
 # 平台配置 - 合并两个项目的平台定义

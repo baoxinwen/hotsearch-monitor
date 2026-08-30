@@ -45,7 +45,6 @@ desktop.ini
 CLAUDE.md
 DESIGN.md
 
-# 测试（本地开发用）
+# 本地临时目录
 test/
-frontend/src/test/
-frontend/vitest.config.ts
+.ui-screenshots/

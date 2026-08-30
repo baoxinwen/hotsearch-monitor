@@ -17,6 +17,8 @@ CUSTOM_TERMS = [
     "人工智能", "大模型", "新能源", "电动车", "AIGC", "AGI",
     "小米", "华为", "苹果", "三星", "特斯拉",
     "抖音", "快手", "小红书", "拼多多", "淘宝",
+    # 游戏社区黑话（避免被切碎成「喜加」「加一」等碎片）
+    "喜加一", "喜加二", "喜加三", "免费领", "二次元", "三连",
 ]
 
 # 热搜专用停用词（补充通用停用词表之外的噪声）
@@ -28,6 +30,9 @@ _HOTSEARCH_STOP_WORDS = {
     "一个", "一种", "一些", "一次", "一部", "一场", "一条", "一起", "一样",
     "不是", "可以", "已经", "还有", "就是", "这是", "那是", "也是", "都是",
     "如何", "为什么", "怎么样", "什么样", "什么时候",
+    # 互动/平台行为噪声
+    "点赞", "投币", "收藏", "转发", "弹幕", "评论区", "评论", "UP主", "主播",
+    "加一", "加二", "加三", "白嫖", "抽奖", "开奖", "福利",
     "等等", "——", "…", "...", "||", "｜",
 }
 
@@ -77,10 +82,21 @@ def _load_jieba():
         return False
 
 
-def extract_keywords(items: List[dict], top_n: int = 20) -> List[Tuple[str, int]]:
-    """从热搜标题中提取关键词频率统计"""
+def extract_keywords(items: List[dict], top_n: int = 20,
+                     extra_stop_words: List[str] = None,
+                     min_term_length: int = 2) -> List[Tuple[str, int]]:
+    """从热搜标题中提取关键词频率统计
+
+    extra_stop_words: 用户自定义停用词（来自 user_config.stop_words）
+    min_term_length:  关键词最小长度（2-8，过滤分词碎片）
+    """
     if not items:
         return []
+
+    min_len = min(8, max(2, int(min_term_length or 2)))
+    stop_words = STOP_WORDS
+    if extra_stop_words:
+        stop_words = STOP_WORDS | frozenset(w for w in extra_stop_words if w)
 
     titles = [item.get("title", "") for item in items if item.get("title")]
     if not titles:
@@ -105,21 +121,21 @@ def extract_keywords(items: List[dict], top_n: int = 20) -> List[Tuple[str, int]
         words = _jieba.lcut(remaining)
         for word in words:
             word = word.strip()
-            # 过滤：长度>1、非停用词、非纯数字、非纯标点、非纯字母单字
-            if (len(word) > 1
-                and word not in STOP_WORDS
+            # 过滤：长度达标、非停用词、非纯数字、非纯标点、非纯字母单字
+            if (len(word) >= min_len
+                and word not in stop_words
                 and not word.isdigit()
                 and not re.match(r'^[\W_]+$', word)
                 and not re.match(r'^[a-zA-Z]$', word)):
                 counter[word] += 1
     else:
-        # 降级：简单的中文词组提取（2-4字）
-        for length in range(4, 1, -1):
+        # 降级：简单的中文词组提取（min_len ~ 4 字）
+        for length in range(4, min_len - 1, -1):
             for i in range(len(remaining) - length + 1):
                 chunk = remaining[i:i + length].strip()
-                if (len(chunk) > 1
+                if (len(chunk) >= min_len
                     and all('一' <= c <= '鿿' for c in chunk)
-                    and chunk not in STOP_WORDS):
+                    and chunk not in stop_words):
                     counter[chunk] += 1
 
     return counter.most_common(top_n)

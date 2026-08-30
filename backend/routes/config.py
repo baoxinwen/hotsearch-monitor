@@ -75,6 +75,17 @@ async def update_config(request: Request):
                     continue
             user_config[field] = val
 
+    # 关键词分析设置
+    if "stop_words" in body:
+        if isinstance(body["stop_words"], list):
+            words = [str(w).strip() for w in body["stop_words"] if str(w).strip()]
+            user_config["stop_words"] = words[:200]
+    if "min_term_length" in body:
+        try:
+            user_config["min_term_length"] = min(8, max(2, int(body["min_term_length"])))
+        except (ValueError, TypeError):
+            pass
+
     # Webhook配置
     if "webhook_enabled" in body:
         user_config["webhook_enabled"] = bool(body["webhook_enabled"])

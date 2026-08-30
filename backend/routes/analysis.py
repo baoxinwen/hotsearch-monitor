@@ -86,7 +86,11 @@ async def get_trending_keywords(
                     all_items.extend(items)
             cached_count = len([p for p in platform_list if app_data.get(p)])
 
-    keywords = extract_keywords(all_items, top_n)
+    keywords = extract_keywords(
+        all_items, top_n,
+        extra_stop_words=user_config.get("stop_words") or [],
+        min_term_length=user_config.get("min_term_length", 2),
+    )
 
     return {
         "success": True,
@@ -133,7 +137,11 @@ async def get_analysis_overview(request: Request, platforms: str = None):
     if not all_items:
         return {"success": False, "message": "暂无数据，请先获取热搜"}
 
-    keywords = extract_keywords(all_items, 20)
+    keywords = extract_keywords(
+        all_items, 20,
+        extra_stop_words=user_config.get("stop_words") or [],
+        min_term_length=user_config.get("min_term_length", 2),
+    )
     platform_dist = analyze_platform_distribution(data)
     category_heat = analyze_category_heat(data, platform_config)
     top_items = analyze_top_items(data, 10)
