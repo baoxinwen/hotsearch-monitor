@@ -118,6 +118,21 @@ class HistoryManager:
                 logger.warning(f"读取快照失败 {f.name}: {e}")
         return None
 
+    def get_snapshots(self, date: str) -> List[dict]:
+        """获取指定日期的完整快照数据（含 data 字段，用于趋势分析）"""
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', date):
+            return []
+        snapshots = []
+        for f in sorted(self.history_dir.glob(f"hotsearch_{date}_*.json")):
+            try:
+                with open(f, "r", encoding="utf-8") as fh:
+                    snap = json.load(fh)
+                    snap["time"] = snap.get("time", "").replace("-", ":")
+                    snapshots.append(snap)
+            except Exception as e:
+                logger.warning(f"读取快照失败 {f.name}: {e}")
+        return snapshots
+
     def delete_snapshot(self, snapshot_id: str) -> bool:
         """删除快照"""
         if not re.match(r'^[a-f0-9-]{1,36}$', snapshot_id):

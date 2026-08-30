@@ -190,12 +190,12 @@ class EmailService:
                 return {"success": True, "message": "发送成功"}
             except smtplib.SMTPAuthenticationError as e:
                 logger.error(f"SMTP认证失败: {e}")
-                return {"success": False, "message": f"SMTP认证失败，请检查账号和授权码: {e}"}
+                return {"success": False, "message": "SMTP认证失败，请检查账号和授权码"}
             except smtplib.SMTPConnectError as e:
                 host = self._cfg("smtp_host", "smtp.163.com")
                 port = self._cfg("smtp_port", 465)
                 logger.error(f"SMTP连接失败: {e}")
-                return {"success": False, "message": f"无法连接到SMTP服务器 {host}:{port} - {e}"}
+                return {"success": False, "message": f"无法连接到SMTP服务器 {host}:{port}"}
             except Exception as e:
                 last_error = f"{type(e).__name__}: {e}"
                 logger.warning(f"邮件发送失败 (attempt {attempt+1}): {last_error}")
@@ -220,7 +220,7 @@ class EmailService:
         msg["Subject"] = subject
         msg.attach(MIMEText(html, "html", "utf-8"))
 
-        logger.info(f"SMTP连接: {smtp_host}:{smtp_port}, 用户: {login_user}")
+        logger.info(f"SMTP连接: {smtp_host}:{smtp_port}")
 
         if smtp_port == 465:
             server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)

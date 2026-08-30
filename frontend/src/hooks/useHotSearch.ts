@@ -25,6 +25,7 @@ export function useHotSearch(): UseHotSearchReturn {
   const [config, setConfig] = useState<UserConfig | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const fetchRef = useRef<(forceRefresh?: boolean) => Promise<void>>(undefined)
 
   const fetchHotSearch = useCallback(async (forceRefresh = false) => {
     setLoading(true)
@@ -43,6 +44,9 @@ export function useHotSearch(): UseHotSearchReturn {
       setLoading(false)
     }
   }, [])
+
+  // Keep ref in sync with latest fetchHotSearch
+  fetchRef.current = fetchHotSearch
 
   const refreshPlatform = useCallback(async (platform: string) => {
     setLoadingPlatforms(prev => ({ ...prev, [platform]: true }))
@@ -88,12 +92,12 @@ export function useHotSearch(): UseHotSearchReturn {
     fetchHotSearch()
   }, [fetchConfig, fetchHotSearch])
 
-  // 自动刷新（递归 setTimeout，避免请求重叠）
+  // 自动刷新（递归 setTimeout，通过 ref 避免 effect 依赖不稳定）
   useEffect(() => {
     let cancelled = false
     const poll = async () => {
       if (cancelled) return
-      await fetchHotSearch()
+      await fetchRef.current?.()
       if (!cancelled) {
         timerRef.current = setTimeout(poll, (config?.update_interval || 300) * 1000)
       }
@@ -103,7 +107,7 @@ export function useHotSearch(): UseHotSearchReturn {
       cancelled = true
       clearTimeout(timerRef.current)
     }
-  }, [config?.update_interval, fetchHotSearch])
+  }, [config?.update_interval])
 
   return {
     data, errors, loading, loadingPlatforms,

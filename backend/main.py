@@ -114,7 +114,7 @@ async def background_email(app):
     logger = logging.getLogger("scheduler")
     await asyncio.sleep(10)
 
-    last_sent_key = None  # 防止重复发送: "frequency_hour_minute"
+    last_sent_slot = None  # 防止重复发送: "frequency_date_hour_minute"
 
     while True:
         try:
@@ -129,22 +129,24 @@ async def background_email(app):
                 frequency = user_config.get("email_frequency", "daily")
 
                 hour, minute = map(int, send_time.split(":"))
-                sent_key = f"{frequency}_{now.hour}_{now.minute}_{now.weekday()}"
 
-                should_send = False
-                if frequency == "hourly" and now.minute == minute:
-                    should_send = True
-                elif frequency == "daily" and now.hour == hour and now.minute == minute:
-                    should_send = True
-                elif frequency == "weekly" and now.weekday() == 0 and now.hour == hour and now.minute == minute:
-                    should_send = True
+                # 生成发送时间槽标识（精确到日期+小时+分钟，防止跨天重复）
+                if frequency == "hourly":
+                    slot_key = f"hourly_{now.strftime('%Y-%m-%d_%H')}_{minute}"
+                    should_send = now.minute == minute
+                elif frequency == "weekly":
+                    slot_key = f"weekly_{now.strftime('%Y-%m-%d')}_{hour}_{minute}"
+                    should_send = now.weekday() == 0 and now.hour == hour and now.minute == minute
+                else:  # daily
+                    slot_key = f"daily_{now.strftime('%Y-%m-%d')}_{hour}_{minute}"
+                    should_send = now.hour == hour and now.minute == minute
 
-                # 防止同一分钟内重复发送
-                if should_send and sent_key == last_sent_key:
+                # 防止同一时间槽内重复发送
+                if should_send and slot_key == last_sent_slot:
                     should_send = False
 
                 if should_send:
-                    last_sent_key = sent_key
+                    last_sent_slot = slot_key
                     logger.info(f"定时推送触发: {frequency} at {send_time}")
                     data = getattr(app.state, "latest_data", {})
                     keywords = user_config.get("keywords", [])
@@ -235,6 +237,12 @@ async def lifespan(app: FastAPI):
         await asyncio.gather(update_task, email_task, return_exceptions=True)
     except asyncio.CancelledError:
         pass
+
+    # 关闭 httpx 客户端连接
+    from fetcher import fetcher
+    if fetcher._client and not fetcher._client.is_closed:
+        await fetcher._client.aclose()
+
     logger.info("热搜监控工具已关闭")
 
 
@@ -323,6 +331,21 @@ async def csrf_middleware(request: Request, call_next):
                 return JSONResponse(
                     status_code=403,
                     content={"success": False, "message": "CSRF token 无效或已过期"},
+                )
+    return await call_next(request)
+
+
+# API Key 认证中间件
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if settings.api_key and request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        skip_auth = ("/health", "/docs", "/openapi.json", "/api/csrf-token")
+        if request.url.path not in skip_auth:
+            key = request.headers.get("X-API-Key", "")
+            if key != settings.api_key:
+                return JSONResponse(
+                    status_code=401,
+                    content={"success": False, "message": "未授权：请提供有效的 API Key"},
                 )
     return await call_next(request)
 

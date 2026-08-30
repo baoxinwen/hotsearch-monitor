@@ -73,8 +73,8 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         if not self.cors_origins:
-            # 开发模式允许 localhost，生产模式允许所有（同源部署时不影响安全）
-            return ["http://localhost:5173", "http://localhost:8000"] if self.debug else ["*"]
+            # 开发模式允许 localhost；生产模式需显式配置（nginx 同源代理不需要 CORS）
+            return ["http://localhost:5173", "http://localhost:8000"] if self.debug else []
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
@@ -140,6 +140,9 @@ PLATFORM_CONFIG = {
     "genshin": {"name": "原神", "category": "游戏", "color": "#a855f7", "icon": "✨", "url": ""},
     "honkai": {"name": "崩坏3", "category": "游戏", "color": "#60a5fa", "icon": "🚀", "url": ""},
     "starrail": {"name": "星穹铁道", "category": "游戏", "color": "#6366f1", "icon": "🚂", "url": ""},
+    # 音乐
+    "netease-music": {"name": "网易云音乐", "category": "音乐", "color": "#dc2626", "icon": "🎵", "url": "https://music.163.com/search?keyword={title}"},
+    "qq-music": {"name": "QQ音乐", "category": "音乐", "color": "#16a34a", "icon": "🎶", "url": "https://y.qq.com/n/ryqq/search?w={title}"},
     # 其他
     "weread": {"name": "微信读书", "category": "其他", "color": "#60a5fa", "icon": "📚", "url": ""},
     "weatheralarm": {"name": "天气预警", "category": "其他", "color": "#f97316", "icon": "⛈️", "url": ""},
@@ -153,6 +156,7 @@ PLATFORM_CATEGORIES = {
     "新闻/资讯": [k for k, v in PLATFORM_CONFIG.items() if v["category"] == "新闻/资讯"],
     "技术/IT": [k for k, v in PLATFORM_CONFIG.items() if v["category"] == "技术/IT"],
     "游戏": [k for k, v in PLATFORM_CONFIG.items() if v["category"] == "游戏"],
+    "音乐": [k for k, v in PLATFORM_CONFIG.items() if v["category"] == "音乐"],
     "其他": [k for k, v in PLATFORM_CONFIG.items() if v["category"] == "其他"],
 }
 

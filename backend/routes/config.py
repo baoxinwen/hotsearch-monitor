@@ -20,9 +20,12 @@ SMTP_FIELDS = {"smtp_host", "smtp_port", "smtp_user", "smtp_password", "mail_fro
 async def get_config(request: Request):
     """获取当前配置"""
     user_config = request.app.state.user_config
+    # 返回时隐藏 SMTP 密码明文
+    safe_config = {k: v for k, v in user_config.items() if k != "smtp_password"}
+    safe_config["smtp_password"] = "***" if user_config.get("smtp_password") else ""
     return {
         "success": True,
-        "config": user_config,
+        "config": safe_config,
         "platforms": PLATFORM_CONFIG,
     }
 
@@ -59,10 +62,12 @@ async def update_config(request: Request):
         if validate_time_format(body["email_time"]):
             user_config["email_time"] = body["email_time"]
 
-    # SMTP配置
+    # SMTP配置（密码为掩码时跳过，不覆盖已有值）
     for field in SMTP_FIELDS:
         if field in body:
             val = str(body[field]).strip() if body[field] else ""
+            if field == "smtp_password" and val == "***":
+                continue
             if field == "smtp_port" and val:
                 try:
                     val = str(int(val))
@@ -86,7 +91,10 @@ async def update_config(request: Request):
     # 同步邮件服务的运行时配置
     _sync_email_config(user_config)
 
-    return {"success": True, "config": user_config}
+    # 返回时隐藏 SMTP 密码明文
+    safe_config = {k: v for k, v in user_config.items() if k != "smtp_password"}
+    safe_config["smtp_password"] = "***" if user_config.get("smtp_password") else ""
+    return {"success": True, "config": safe_config}
 
 
 @router.post("/test-email")

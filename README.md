@@ -1,10 +1,10 @@
 # 热搜监控工具 v1.0
 
-多平台热搜聚合监控工具，支持 48+ 中文平台热搜抓取、关键词过滤、趋势分析、邮件/Webhook 推送。
+多平台热搜聚合监控工具，支持 46 中文平台热搜抓取、关键词过滤、趋势分析、邮件/Webhook 推送。
 
 ## 功能特性
 
-- **48+ 平台支持** — 哔哩哔哩、微博、知乎、抖音、百度、GitHub 等
+- **47 平台支持** — 哔哩哔哩、微博、知乎、抖音、百度、GitHub 等
 - **实时搜索过滤** — 多关键词搜索（逗号/空格分隔），任一匹配即显示
 - **趋势分析** — 中文分词（jieba）关键词频率统计 + 交互式图表（点击/悬停/缩放）
 - **邮件推送** — SMTP 邮件，支持小时/天/周频率，Jinja2 HTML 模板
@@ -91,8 +91,11 @@ npm run dev
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/hotsearch` | 获取热搜数据 |
-| POST | `/api/hotsearch/refresh/{platform}` | 刷新单个平台 |
 | GET | `/api/hotsearch/platforms` | 获取平台列表 |
+| GET | `/api/hotsearch/cache/stats` | 缓存统计 |
+| POST | `/api/hotsearch/cache/clear` | 清除缓存 |
+| POST | `/api/hotsearch/refresh/{platform}` | 刷新单个平台 |
+| POST | `/api/hotsearch/enable/{platform}` | 重新启用被禁用的平台 |
 | GET | `/api/config` | 获取配置 |
 | POST | `/api/config` | 更新配置 |
 | POST | `/api/config/test-email` | 测试邮件 |
@@ -101,8 +104,12 @@ npm run dev
 | GET | `/api/analysis/overview` | 分析概览（支持 `?platforms=` 筛选） |
 | POST | `/api/email/send` | 手动发送邮件报告 |
 | POST | `/api/email/test` | 测试邮件发送（支持传入 SMTP 配置） |
+| GET | `/api/email/verify` | 验证 SMTP 连接 |
 | GET | `/api/history/dates` | 历史日期列表 |
-| GET | `/api/history/{date}` | 指定日期快照 |
+| GET | `/api/history/{date}` | 指定日期快照摘要 |
+| GET | `/api/history/detail/{snapshot_id}` | 快照完整数据 |
+| DELETE | `/api/history/{snapshot_id}` | 删除快照 |
+| GET | `/api/csrf-token` | 获取 CSRF 令牌 |
 | GET | `/health` | 健康检查 |
 
 ## 技术栈

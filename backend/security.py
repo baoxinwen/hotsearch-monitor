@@ -53,11 +53,13 @@ class Encryption:
 
     def encrypt(self, text: str) -> str:
         if not text or not self._cipher:
+            if text and not self._cipher:
+                logger.warning("加密未初始化，敏感数据将以明文存储")
             return text
         try:
             return self._cipher.encrypt(text.encode()).decode()
         except Exception as e:
-            logger.error(f"Encryption failed: {e}")
+            logger.error(f"加密失败，敏感数据将以明文存储: {e}")
             return text
 
     def decrypt(self, token: str) -> str:
@@ -84,7 +86,7 @@ class CSRFProtection:
         signature = hmac.new(self.secret_key.encode(), data.encode(), hashlib.sha256).hexdigest()
         return f"{data}:{signature}"
 
-    def validate_token(self, token: str, max_age: int = 86400) -> bool:
+    def validate_token(self, token: str, max_age: int = 7200) -> bool:
         if not token:
             return False
         try:

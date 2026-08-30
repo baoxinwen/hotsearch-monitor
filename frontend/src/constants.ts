@@ -6,6 +6,7 @@ export const PLATFORM_CATEGORIES: Record<string, string[]> = {
   '新闻/资讯': ['baidu', 'thepaper', 'toutiao', 'qq-news', 'sina', 'sina-news', 'netease-news', 'huxiu', 'ifanr'],
   '技术/IT': ['sspai', 'ithome', 'ithome-xijiayi', 'juejin', 'jianshu', 'guokr', '36kr', '51cto', 'csdn', 'nodeseek', 'hellogithub'],
   '游戏': ['lol', 'genshin', 'honkai', 'starrail'],
+  '音乐': ['netease-music', 'qq-music'],
   '其他': ['weread', 'weatheralarm', 'earthquake', 'history'],
 }
 
@@ -52,6 +53,8 @@ export const PLATFORM_CONFIG: Record<string, PlatformInfo> = {
   genshin: { name: '原神', category: '游戏', color: '#a855f7', icon: '✨', url: '' },
   honkai: { name: '崩坏3', category: '游戏', color: '#60a5fa', icon: '🚀', url: '' },
   starrail: { name: '星穹铁道', category: '游戏', color: '#6366f1', icon: '🚂', url: '' },
+  'netease-music': { name: '网易云音乐', category: '音乐', color: '#dc2626', icon: '🎵', url: '' },
+  'qq-music': { name: 'QQ音乐', category: '音乐', color: '#16a34a', icon: '🎶', url: '' },
   weread: { name: '微信读书', category: '其他', color: '#60a5fa', icon: '📚', url: '' },
   weatheralarm: { name: '天气预警', category: '其他', color: '#f97316', icon: '⛈️', url: '' },
   earthquake: { name: '地震速报', category: '其他', color: '#1f2937', icon: '🌋', url: '' },

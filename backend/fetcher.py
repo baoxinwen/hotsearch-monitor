@@ -159,21 +159,17 @@ class HotSearchFetcher:
                 rank = i + 1
 
             # 热度值：兼容 hot / hot_value / heat / score / value（0 是合法值）
-            hot_raw = item.get("hot_value")
-            if hot_raw is None:
-                hot_raw = item.get("hot")
-            if hot_raw is None:
-                hot_raw = item.get("heat")
-            if hot_raw is None:
-                hot_raw = item.get("score")
-            if hot_raw is None:
-                hot_raw = item.get("value")
-            if hot_raw is None:
-                hot_raw = ""
-            score = parse_score(hot_raw) if hot_raw is not None else 0
+            hot_raw = next(
+                (item.get(k) for k in ("hot_value", "hot", "heat", "score", "value") if item.get(k) is not None),
+                "",
+            )
+            score = parse_score(hot_raw)
 
             # URL：优先API返回，否则用模板（避免 format 注入）
             item_url = item.get("url") or item.get("link") or item.get("mobileUrl") or ""
+            # 校验 URL 协议，防止 javascript: 等恶意 URL
+            if item_url and not item_url.startswith(("https://", "http://")):
+                item_url = ""
             if not item_url and platform_info.get("url"):
                 try:
                     item_url = platform_info["url"].replace("{title}", quote(title, safe=""))
@@ -190,7 +186,7 @@ class HotSearchFetcher:
                 "platform": platform,
                 "url": item_url,
                 "category": platform_info.get("category", ""),
-                "hot_display": str(hot_raw) if hot_raw is not None and hot_raw != "" else "",
+                "hot_display": str(hot_raw) if hot_raw not in (None, "", 0) else "",
                 "timestamp": int(time.time() * 1000),
             })
 
