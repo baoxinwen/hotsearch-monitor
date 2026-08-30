@@ -29,40 +29,9 @@ from routes.email import router as email_router
 from routes.history import router as history_router
 from routes.health import router as health_router
 
-# ==================== 日志配置 ====================
+# ==================== 日志配置（RotatingFileHandler，见 logging_setup.py） ====================
 
-def setup_logging(debug: bool = False):
-    log_dir = Path(__file__).parent.parent / "logs"
-    log_dir.mkdir(exist_ok=True)
-
-    formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s [%(module)s:%(funcName)s:%(lineno)d] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    root = logging.getLogger()
-    root.setLevel(logging.DEBUG if debug else logging.INFO)
-    root.handlers.clear()
-
-    # 控制台
-    ch = logging.StreamHandler()
-    ch.setFormatter(formatter)
-    ch.setLevel(logging.DEBUG if debug else logging.INFO)
-    root.addHandler(ch)
-
-    # 文件
-    fh = logging.FileHandler(log_dir / "hotsearch.log", encoding="utf-8")
-    fh.setFormatter(formatter)
-    fh.setLevel(logging.INFO)
-    root.addHandler(fh)
-
-    # 错误日志
-    eh = logging.FileHandler(log_dir / "error.log", encoding="utf-8")
-    eh.setFormatter(formatter)
-    eh.setLevel(logging.ERROR)
-    root.addHandler(eh)
-
-    return logging.getLogger(__name__)
+from logging_setup import setup_logging
 
 
 # ==================== 后台任务 ====================
@@ -249,7 +218,8 @@ async def lifespan(app: FastAPI):
 # ==================== 创建应用 ====================
 
 settings = get_settings()
-logger = setup_logging(settings.debug)
+setup_logging(settings.debug)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="热搜监控 API",
