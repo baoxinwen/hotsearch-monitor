@@ -1,5 +1,6 @@
 """趋势分析API"""
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -86,10 +87,11 @@ async def get_trending_keywords(
                     all_items.extend(items)
             cached_count = len([p for p in platform_list if app_data.get(p)])
 
-    keywords = extract_keywords(
-        all_items, top_n,
-        extra_stop_words=user_config.get("stop_words") or [],
-        min_term_length=user_config.get("min_term_length", 2),
+    # jieba 分词与文件 IO 是同步阻塞操作，放线程池避免卡住事件循环
+    keywords = await asyncio.to_thread(
+        extract_keywords, all_items, top_n,
+        user_config.get("stop_words") or [],
+        user_config.get("min_term_length", 2),
     )
 
     return {
@@ -137,10 +139,10 @@ async def get_analysis_overview(request: Request, platforms: str = None):
     if not all_items:
         return {"success": False, "message": "暂无数据，请先获取热搜"}
 
-    keywords = extract_keywords(
-        all_items, 20,
-        extra_stop_words=user_config.get("stop_words") or [],
-        min_term_length=user_config.get("min_term_length", 2),
+    keywords = await asyncio.to_thread(
+        extract_keywords, all_items, 20,
+        user_config.get("stop_words") or [],
+        user_config.get("min_term_length", 2),
     )
     platform_dist = analyze_platform_distribution(data)
     category_heat = analyze_category_heat(data, platform_config)
@@ -155,7 +157,8 @@ async def get_analysis_overview(request: Request, platforms: str = None):
         from history import history_manager
         from datetime import datetime, timedelta
         today = datetime.now().strftime("%Y-%m-%d")
-        snapshots = history_manager.get_snapshots(today)
+        # get_snapshots 全量解析当天快照文件（每个 ~1MB），放线程池
+        snapshots = await asyncio.to_thread(history_manager.get_snapshots, today)
         if snapshots:
             keyword_trend = analyze_keyword_trend(snapshots, config_keywords[:5])
 

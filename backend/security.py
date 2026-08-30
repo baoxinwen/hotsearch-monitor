@@ -31,13 +31,10 @@ class Encryption:
                 pass
 
     def init_key(self, key_file: str, key_env: str = ""):
-        """初始化或加载加密密钥"""
+        """初始化或加载加密密钥。配置错误时直接抛错（快速失败），不做静默降级。"""
         if key_env:
-            try:
-                self._cipher = Fernet(key_env.encode())
-                return
-            except Exception:
-                pass
+            self._cipher = Fernet(key_env.encode())
+            return
 
         if os.path.exists(key_file):
             with open(key_file, "rb") as f:
@@ -48,27 +45,34 @@ class Encryption:
         key = Fernet.generate_key()
         with open(key_file, "wb") as f:
             f.write(key)
+        if os.name == "posix":
+            os.chmod(key_file, 0o600)
         self._cipher = Fernet(key)
         logger.info(f"Generated new encryption key: {key_file}")
 
     def encrypt(self, text: str) -> str:
-        if not text or not self._cipher:
-            if text and not self._cipher:
-                logger.warning("加密未初始化，敏感数据将以明文存储")
+        if not text:
             return text
+        if not self._cipher:
+            # 安全策略：加密不可用时拒绝保存，绝不明文落盘
+            raise RuntimeError("加密未初始化，拒绝明文存储敏感数据")
         try:
             return self._cipher.encrypt(text.encode()).decode()
         except Exception as e:
-            logger.error(f"加密失败，敏感数据将以明文存储: {e}")
-            return text
+            raise RuntimeError(f"加密失败: {e}") from e
 
     def decrypt(self, token: str) -> str:
-        if not token or not self._cipher:
+        if not token:
             return token
+        if not self._cipher:
+            logger.warning("加密未初始化，无法解密已存储的敏感数据")
+            return ""
         try:
             return self._cipher.decrypt(token.encode()).decode()
         except Exception:
-            return token
+            # 解密失败说明密文损坏或密钥不匹配——绝不能把密文当密码发出去
+            logger.error("解密失败：密文无效或密钥不匹配，已丢弃该值")
+            return ""
 
 
 # ==================== CSRF ====================
@@ -108,9 +112,10 @@ class CSRFProtection:
 class RateLimiter:
     """内存限流器"""
 
-    def __init__(self, max_requests: int = 60, window: int = 60):
+    def __init__(self, max_requests: int = 60, window: int = 60, max_ips: int = 10000):
         self.max_requests = max_requests
         self.window = window
+        self.max_ips = max_ips
         self.requests: dict = defaultdict(list)
         self.blocked: dict = {}
         self._last_cleanup = time.time()
@@ -131,6 +136,11 @@ class RateLimiter:
     def is_allowed(self, ip: str) -> Tuple[bool, int]:
         now = time.time()
         self._cleanup(now)
+
+        # 防伪造 IP 撑爆内存：超过容量上限时丢弃最久未活跃的条目
+        if ip not in self.requests and len(self.requests) >= self.max_ips:
+            oldest = min(self.requests.items(), key=lambda kv: kv[1][-1] if kv[1] else 0)[0]
+            self.requests.pop(oldest, None)
 
         if ip in self.blocked:
             if now < self.blocked[ip]:
@@ -172,6 +182,13 @@ def validate_time_format(time_str: str) -> bool:
     if not time_str or not isinstance(time_str, str):
         return False
     return bool(re.match(r'^([01]\d|2[0-3]):([0-5]\d)$', time_str))
+
+
+def sanitize_for_log(text) -> str:
+    """日志净化：替换控制字符防止伪造日志行，并截断超长内容"""
+    if not isinstance(text, str):
+        text = str(text)
+    return re.sub(r"[\r\n\t]+", " ", text)[:200]
 
 
 def sanitize_keywords(keywords: list) -> list:

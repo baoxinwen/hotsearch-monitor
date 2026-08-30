@@ -258,6 +258,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+if not settings.api_key:
+    logging.getLogger(__name__).warning(
+        "未设置 API_KEY：所有 /api 接口无需认证，请勿将服务直接暴露到公网"
+    )
+
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -281,7 +287,7 @@ async def security_headers(request: Request, call_next):
     if settings.debug:
         csp = "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:* ws://localhost:*"
     else:
-        csp = "default-src 'self'; connect-src 'self'"
+        csp = "default-src 'self'; connect-src 'self'; img-src 'self' data:"
     response.headers["Content-Security-Policy"] = csp
 
     return response
@@ -297,7 +303,9 @@ async def rate_limit_middleware(request: Request, call_next):
     if request.url.path in ("/health", "/docs", "/openapi.json"):
         return await call_next(request)
 
-    ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    xff = request.headers.get("X-Forwarded-For", "")
+    # 取最右一段：那是本方代理追加的，客户端无法伪造；直连场景回退到 TCP 对端地址
+    ip = xff.split(",")[-1].strip() if xff else ""
     if not ip:
         ip = request.headers.get("X-Real-IP", "")
     if not ip:
@@ -335,12 +343,48 @@ async def csrf_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# 跨站 Origin 校验：浏览器发起的跨站写请求必带 Origin，直接拒绝（CSRF 纵深防御）
+@app.middleware("http")
+async def origin_check_middleware(request: Request, call_next):
+    if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+        origin = request.headers.get("Origin", "")
+        if not origin:
+            referer = request.headers.get("Referer", "")
+            if "://" in referer:
+                rest = referer.split("://", 1)[1]
+                origin = referer.split("://", 1)[0] + "://" + rest.split("/", 1)[0]
+        if origin:
+            host_header = request.headers.get("host", "").strip()
+            allowed = {f"http://{host_header}", f"https://{host_header}"}
+            allowed.update(o.rstrip("/") for o in settings.cors_origins_list)
+            if origin.rstrip("/") not in allowed:
+                return JSONResponse(
+                    status_code=403,
+                    content={"success": False, "message": "跨站请求被拒绝"},
+                )
+    return await call_next(request)
+
+
+# 请求体大小限制（防直连后端端口绕过 nginx 限制）
+@app.middleware("http")
+async def body_size_middleware(request: Request, call_next):
+    if request.method in ("POST", "PUT", "PATCH"):
+        content_length = request.headers.get("content-length", "")
+        if content_length.isdigit() and int(content_length) > 1_000_000:
+            return JSONResponse(
+                status_code=413,
+                content={"success": False, "message": "请求体过大"},
+            )
+    return await call_next(request)
+
+
 # API Key 认证中间件
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
-    if settings.api_key and request.method in ("POST", "PUT", "DELETE", "PATCH"):
+    # 设置了 API_KEY 时，/api/* 全部方法（含 GET）都要求认证
+    if settings.api_key:
         skip_auth = ("/health", "/docs", "/openapi.json", "/api/csrf-token")
-        if request.url.path not in skip_auth:
+        if request.url.path.startswith("/api") and request.url.path not in skip_auth:
             key = request.headers.get("X-API-Key", "")
             if key != settings.api_key:
                 return JSONResponse(

@@ -3,10 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark light" />
   <title>热搜监控</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23f7a501'/><text x='50' y='72' font-size='62' font-family='sans-serif' font-weight='800' text-anchor='middle' fill='%231a1405'>H</text></svg>" />
+  <script>
+    // 首帧前应用主题，避免闪烁（完整逻辑见 hooks/useTheme；默认深色）
+    try {
+      var t = JSON.parse(localStorage.getItem('hotsearch_monitor_theme') || '"dark"')
+      var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+      document.documentElement.classList.toggle('dark', dark)
+    } catch (e) {}
+  </script>
 </head>
-<body class="bg-p-canvas dark:bg-p-dark-canvas text-p-ink dark:text-p-dark-ink">
+<body>
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>

@@ -11,7 +11,7 @@ from email.utils import formataddr
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from jinja2 import Template
+from jinja2 import Environment
 
 from config import PLATFORM_CONFIG, get_settings
 from security import escape_html
@@ -75,7 +75,8 @@ class EmailService:
 
     def __init__(self):
         self.settings = get_settings()
-        self._template = Template(REPORT_TEMPLATE)
+        # autoescape=True：热搜标题来自外部平台，必须转义后才能进入邮件 HTML
+        self._template = Environment(autoescape=True).from_string(REPORT_TEMPLATE)
         # 运行时SMTP配置（从JSON配置覆盖）
         self._runtime_config: dict = {}
 
@@ -205,6 +206,9 @@ class EmailService:
 
     def _smtp_send(self, recipients: List[str], subject: str, html: str):
         """同步SMTP发送"""
+        # 邮件头注入防线：剔除含换行的地址
+        recipients = [r.strip() for r in recipients
+                      if isinstance(r, str) and "\r" not in r and "\n" not in r and r.strip()]
         sender = self._get_sender()
         login_user = self._get_login_user()
         smtp_host = self._cfg("smtp_host", "smtp.163.com")

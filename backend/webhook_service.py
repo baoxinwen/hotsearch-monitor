@@ -137,7 +137,7 @@ def _validate_webhook_url(url: str) -> Optional[str]:
         for _, _, _, _, sockaddr in resolved_ips:
             ip = ipaddress.ip_address(sockaddr[0])
             if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast:
-                return f"不允许访问内网地址 ({hostname} 解析到 {ip})"
+                return "不允许访问内网地址"
     except (socket.gaierror, OSError):
         return "无法解析域名"
 
@@ -167,6 +167,10 @@ class WebhookService:
         payload = formatter(data, keywords or [], frequency)
 
         try:
+            # 发送前二次校验，缩小 DNS rebinding 的窗口
+            recheck = _validate_webhook_url(url)
+            if recheck:
+                return {"success": False, "message": recheck}
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(url, json=payload)
                 if resp.status_code < 300:
@@ -180,7 +184,7 @@ class WebhookService:
             return {"success": False, "message": "推送超时"}
         except Exception as e:
             logger.error(f"Webhook 异常: {type(e).__name__}: {e}")
-            return {"success": False, "message": f"推送失败: {e}"}
+            return {"success": False, "message": "推送失败，请检查 URL 或稍后再试"}
 
 
 # 全局实例

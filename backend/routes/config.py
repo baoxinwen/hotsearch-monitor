@@ -62,6 +62,18 @@ async def update_config(request: Request):
         if validate_time_format(body["email_time"]):
             user_config["email_time"] = body["email_time"]
 
+    # 防 SMTP 凭据外泄：修改 smtp_host 时必须同时重新输入密码，
+    # 否则攻击者可将主机指向自己的服务器窃取受害者真实授权码
+    if "smtp_host" in body:
+        new_host = str(body.get("smtp_host") or "").strip()
+        old_host = str(user_config.get("smtp_host") or "")
+        has_saved_pwd = bool(user_config.get("smtp_password"))
+        pwd_in_body = str(body.get("smtp_password") or "").strip()
+        if (new_host != old_host and has_saved_pwd
+                and (not pwd_in_body or pwd_in_body == "***")):
+            return {"success": False,
+                    "message": "修改 SMTP 服务器需要重新输入密码/授权码（安全策略）"}
+
     # SMTP配置（密码为掩码时跳过，不覆盖已有值）
     for field in SMTP_FIELDS:
         if field in body:
@@ -78,8 +90,9 @@ async def update_config(request: Request):
     # 关键词分析设置
     if "stop_words" in body:
         if isinstance(body["stop_words"], list):
-            words = [str(w).strip() for w in body["stop_words"] if str(w).strip()]
-            user_config["stop_words"] = words[:200]
+            words = [str(w).strip()[:100] for w in body["stop_words"][:200]
+                     if w is not None and not isinstance(w, (dict, list)) and str(w).strip()]
+            user_config["stop_words"] = words
     if "min_term_length" in body:
         try:
             user_config["min_term_length"] = min(8, max(2, int(body["min_term_length"])))
@@ -95,8 +108,11 @@ async def update_config(request: Request):
         if body["webhook_type"] in ("generic", "wechat", "dingtalk", "feishu"):
             user_config["webhook_type"] = body["webhook_type"]
 
-    # 持久化
-    _save_config(user_config)
+    # 持久化（加密失败时中止，不落盘）
+    try:
+        _save_config(user_config)
+    except RuntimeError:
+        return {"success": False, "message": "加密服务不可用，配置未保存"}
     request.app.state.user_config = user_config
 
     # 同步邮件服务的运行时配置
@@ -171,11 +187,15 @@ def _save_config(config: dict):
     config_path = config_dir / "user_config.json"
     tmp_path = config_path.with_suffix(".tmp")
 
-    # 写入前加密 smtp_password（内存中保持明文）
+    # 写入前加密 smtp_password（内存中保持明文）；加密失败则中止保存，绝不明文落盘
     save_data = config.copy()
     pwd = save_data.get("smtp_password", "")
     if pwd and not pwd.startswith("gAAAAA"):  # gAAAAA 是 Fernet token 的固定前缀
-        save_data["smtp_password"] = encryption.encrypt(pwd)
+        try:
+            save_data["smtp_password"] = encryption.encrypt(pwd)
+        except RuntimeError as enc_err:
+            logger.error(f"加密失败，取消保存配置: {enc_err}")
+            raise
 
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:

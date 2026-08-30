@@ -1,9 +1,13 @@
 """邮件订阅API"""
 
+import ipaddress
 import logging
+import socket
+
 from fastapi import APIRouter, Request
 
 from email_service import email_service
+from security import sanitize_for_log, validate_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/email", tags=["email"])
@@ -17,10 +21,10 @@ async def send_report(request: Request):
         from fetcher import fetcher
         from filter import filter_by_keywords
 
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        # 安全策略：收件人强制来自已保存配置，不接受请求体指定（防滥用为发信机）
         user_config = request.app.state.user_config
 
-        recipients = body.get("recipients") or user_config.get("email_to", [])
+        recipients = [r for r in (user_config.get("email_to") or []) if validate_email(str(r))]
         if not recipients:
             return {"success": False, "message": "未设置收件人"}
 
@@ -28,7 +32,7 @@ async def send_report(request: Request):
         platforms = user_config.get("platforms") or list(PLATFORM_CONFIG.keys())
         keywords = user_config.get("keywords", [])
 
-        logger.info(f"邮件报告: 抓取 {len(platforms)} 个平台, 关键词: {keywords or '无'}")
+        logger.info(f"邮件报告: 抓取 {len(platforms)} 个平台, 关键词: {sanitize_for_log(keywords) or '无'}")
         data, errors = await fetcher.fetch_multiple(platforms)
 
         # 按关键词过滤
@@ -51,9 +55,9 @@ async def send_report(request: Request):
             frequency=user_config.get("email_frequency", "daily"),
         )
         return result
-    except Exception as e:
-        logger.error(f"邮件报告异常: {type(e).__name__}: {e}", exc_info=True)
-        return {"success": False, "message": f"发送失败: {type(e).__name__}: {e}"}
+    except Exception:
+        logger.exception("邮件报告异常")
+        return {"success": False, "message": "发送失败，详情请查看服务端日志"}
 
 
 @router.post("/test")
@@ -72,6 +76,17 @@ async def test_email(request: Request):
         # 如果前端传了 SMTP 配置（用户未保存就点测试），临时更新邮件服务
         from routes.config import SMTP_FIELDS
         smtp_from_body = {k: body[k] for k in SMTP_FIELDS if k in body and body[k]}
+
+        # 防 SSRF：自定义 SMTP 主机不允许解析到内网地址
+        probe_host = smtp_from_body.get("smtp_host")
+        if probe_host:
+            try:
+                for info in socket.getaddrinfo(str(probe_host), None):
+                    ip = ipaddress.ip_address(info[4][0])
+                    if ip.is_private or ip.is_loopback or ip.is_link_local:
+                        return {"success": False, "message": "SMTP 服务器不允许指向内网地址"}
+            except socket.gaierror:
+                return {"success": False, "message": "SMTP 服务器无法解析"}
         saved_runtime = dict(email_service._runtime_config)  # 备份
         try:
             if smtp_from_body:
@@ -81,13 +96,13 @@ async def test_email(request: Request):
                 from routes.config import _sync_email_config
                 _sync_email_config(request.app.state.user_config)
 
-            logger.info(f"发送测试邮件到: {recipient}")
+            logger.info(f"发送测试邮件到: {sanitize_for_log(recipient)}")
             return await email_service.send_test(recipient)
         finally:
             email_service._runtime_config = saved_runtime  # 恢复，避免污染全局
-    except Exception as e:
-        logger.error(f"测试邮件异常: {type(e).__name__}: {e}", exc_info=True)
-        return {"success": False, "message": f"发送失败: {type(e).__name__}: {e}"}
+    except Exception:
+        logger.exception("测试邮件异常")
+        return {"success": False, "message": "发送失败，详情请查看服务端日志"}
 
 
 @router.get("/verify")
