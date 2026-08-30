@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { Menu, Moon, RefreshCw, Search, Sun } from 'lucide-react'
 import { Button, Kbd, Spinner } from '../components/ui'
 import { Tooltip } from '../components/overlay'
-import { useHotsearch, useConfig } from '../lib/queries'
+import { useHotsearch } from '../lib/queries'
 import { formatCountdown, parseLocalDateTime } from '../lib/format'
 import { qk } from '../lib/queries'
 import { useQueryClient } from '@tanstack/react-query'
@@ -15,32 +15,36 @@ const TITLES: Record<string, string> = {
   '/settings': '设置',
 }
 
-/** 更新状态：相对时间 + 下次刷新倒计时 + 进行中指示 */
+/** 更新状态：相对时间 + 下次刷新倒计时 + 进行中/失败指示 */
 export function UpdateStatus() {
-  const intervalSec = useConfig().data?.update_interval
-  const { data, isFetching, dataUpdatedAt } = useHotsearch(intervalSec)
-  const [, tick] = useTickerMs()
+  const { data, isFetching, isError, dataUpdatedAt } = useHotsearch()
 
   let text = '等待数据…'
-  if (data?.update_time) {
+  if (isError) {
+    text = '更新失败，显示的可能不是最新数据'
+  } else if (data?.update_time) {
     const last = parseLocalDateTime(data.update_time)
     const fetchBase = dataUpdatedAt || Date.now()
-    if (last && intervalSec) {
+    if (last) {
       const elapsed = (Date.now() - fetchBase) / 1000
-      const remain = Math.max(0, intervalSec - elapsed)
-      text = `更新于 ${data.update_time.slice(11, 16)} · 下次刷新 ${formatCountdown(remain)}`
+      const remain = Math.max(0, 300 - elapsed)
+      text = `更新于 ${data.update_time.slice(11, 16)}${remain > 0 ? ` · 下次刷新 ${formatCountdown(remain)}` : ''}`
     } else {
       text = `更新于 ${data.update_time.slice(11, 16)}`
     }
   }
-  void tick
 
   return (
-    <span className="hidden items-center gap-2 text-xs text-mute md:inline-flex" title={data?.update_time}>
+    <span className={`hidden items-center gap-2 text-xs md:inline-flex ${isError ? 'text-warn' : 'text-mute'}`} title={data?.update_time}>
       {isFetching ? (
         <>
           <Spinner size={12} className="text-accent" />
           <span className="text-accent">正在更新…</span>
+        </>
+      ) : isError ? (
+        <>
+          <span className="h-[7px] w-[7px] rounded-full bg-warn" />
+          <span>{text}</span>
         </>
       ) : (
         <>

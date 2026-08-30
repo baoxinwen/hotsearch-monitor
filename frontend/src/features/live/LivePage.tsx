@@ -8,7 +8,7 @@ import { MergedFeed } from './MergedFeed'
 import { PlatformBoard } from './PlatformBoard'
 import { PlatformPicker } from '../../components/app/PlatformPicker'
 import { DisabledBanner } from '../../components/app/DisabledBanner'
-import { Skeleton } from '../../components/ui'
+import { Button, EmptyState, Skeleton } from '../../components/ui'
 
 /**
  * 实时热搜（监控台首页）
@@ -20,7 +20,8 @@ export function LivePage() {
   const [input, setInput] = useState(urlQuery)
 
   const intervalSec = useConfig().data?.update_interval
-  const { data, isLoading } = useHotsearch(intervalSec)
+  void intervalSec
+  const { data, isLoading, isError, refetch } = useHotsearch()
   const { data: platforms } = usePlatforms()
   const { data: rankChanges } = useRankChanges()
   const view = useUIStore((s) => s.liveView)
@@ -49,6 +50,16 @@ export function LivePage() {
   const allPlatforms = Object.keys(platforms?.platforms ?? {}).length
   const disabledCount = data?.disabled_platforms.length ?? 0
 
+  if (isError) {
+    return (
+      <EmptyState
+        title="数据更新失败"
+        description="无法连接到后端服务，或服务端开启了 API Key 认证（需在设置中配置）。当前可能显示缓存数据。"
+        action={<Button variant="primary" onClick={() => void refetch()}>重试</Button>}
+      />
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="space-y-4 p-4 sm:p-6">
@@ -73,6 +84,7 @@ export function LivePage() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="搜索标题，多关键词用空格分隔，按 / 聚焦"
             aria-label="搜索热搜标题"
+            data-hotsearch-input
             className="input pr-8 pl-8"
           />
           {input && (

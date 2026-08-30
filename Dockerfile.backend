@@ -9,8 +9,13 @@ RUN pip install --no-cache-dir -r requirements.txt && apt-get update && apt-get 
 # 复制后端代码
 COPY backend/ ./backend/
 
-# 创建运行时目录（通过 volume 挂载持久化）
-RUN mkdir -p data/history config logs
+# 创建运行时目录 + 非 root 运行用户
+# 注意：compose 若把宿主目录 bind-mount 进来，Linux 宿主需保证 uid 1000 可写
+RUN mkdir -p data/history config logs \
+    && useradd -r -u 1000 -M appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1

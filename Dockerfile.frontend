@@ -1,8 +1,9 @@
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+# npm ci 严格按 package-lock 安装，保证构建可复现
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm install
+RUN npm ci
 COPY frontend/ .
 RUN npm run build
 

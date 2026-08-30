@@ -3,6 +3,7 @@ import * as TabsPrimitive from '@radix-ui/react-tabs'
 import { Info, Monitor, Plus, Save, Send, ToggleLeft, Trash2, X } from 'lucide-react'
 import type { EmailFrequency, UserConfig, WebhookType } from '../../types'
 import { useClearCache, useConfig, useHealth, usePlatforms, useSendReport, useTestEmailWithConfig, useTestWebhook, useUpdateConfig } from '../../lib/queries'
+import { getStoredApiKey, setStoredApiKey } from '../../lib/api'
 import { useTheme } from '../../hooks/useTheme'
 import { useUIStore } from '../../lib/store'
 import { formatInterval } from '../../lib/format'
@@ -501,6 +502,8 @@ function AppearanceTab() {
 function AboutTab() {
   const { data: health } = useHealth()
   const clearCache = useClearCache()
+  const [apiKey, setApiKey] = useState(getStoredApiKey())
+  const [saved, setSaved] = useState(false)
   return (
     <div className="space-y-4">
       <Card className="p-4">
@@ -529,6 +532,28 @@ function AboutTab() {
             </li>
           ))}
         </ul>
+      </Card>
+      <Card className="p-4">
+        <h3 className="t-label mb-1">API 访问密钥</h3>
+        <p className="mb-2.5 mt-0.5 text-xs text-mute">
+          仅当后端通过环境变量 <code className="rounded-xs bg-surface-2 px-1">API_KEY</code> 启用认证时需要填写，
+          保存在本机浏览器中
+        </p>
+        <div className="flex max-w-md gap-2">
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => { setApiKey(e.target.value); setSaved(false) }}
+            placeholder="后端 API_KEY 环境变量的值"
+            className="input"
+          />
+          <Button
+            variant="primary"
+            onClick={() => { setStoredApiKey(apiKey.trim()); setSaved(true) }}
+          >
+            <Save size={13} /> {saved ? '已保存' : '保存'}
+          </Button>
+        </div>
       </Card>
       <Card className="p-4">
         <h3 className="t-label mb-2">维护</h3>

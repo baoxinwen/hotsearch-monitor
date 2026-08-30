@@ -2,6 +2,22 @@
 
 const REQUEST_TIMEOUT = 30000
 
+/** 可选的 API 访问密钥（后端设置 API_KEY 环境变量时必填），在设置页配置 */
+const API_KEY_STORAGE = 'hotsearch_monitor_api_key'
+
+export function getStoredApiKey(): string {
+  try {
+    return JSON.parse(localStorage.getItem(API_KEY_STORAGE) || '""') || ''
+  } catch {
+    return ''
+  }
+}
+
+export function setStoredApiKey(key: string) {
+  if (key) localStorage.setItem(API_KEY_STORAGE, JSON.stringify(key))
+  else localStorage.removeItem(API_KEY_STORAGE)
+}
+
 let csrfToken = ''
 
 /** 仅供测试：重置模块级 CSRF token 缓存 */
@@ -28,6 +44,9 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
     ...(options.headers as Record<string, string>),
   }
 
+  const apiKey = getStoredApiKey()
+  if (apiKey) headers['X-API-Key'] = apiKey
+
   const method = (options.method || 'GET').toUpperCase()
   if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
     if (!csrfToken) await fetchCsrfToken()
@@ -50,7 +69,11 @@ export async function apiFetch<T = unknown>(path: string, options: ApiFetchOptio
     try {
       const err = await resp.json()
       if (err?.message) message = err.message
+      else if (err?.detail) message = String(err.detail)
     } catch { /* 非 JSON 错误体 */ }
+    if (resp.status === 401 && !getStoredApiKey()) {
+      message = '服务端已启用 API Key 认证，请在「设置 → 关于 → API 访问密钥」中填写'
+    }
     throw new Error(message)
   }
 
@@ -100,4 +123,6 @@ export const API = {
 
   /** 快照对比（Phase 3） */
   getSnapshotDelta: (snapshotId: string) => apiFetch(`/api/history/compare/${snapshotId}`),
+
+  health: () => apiFetch('/health'),
 } as const

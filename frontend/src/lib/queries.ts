@@ -50,8 +50,10 @@ export function useConfig() {
   })
 }
 
-/** 热搜主数据；按配置的 update_interval 轮询，标签页隐藏时暂停 */
-export function useHotsearch(updateIntervalSec?: number) {
+/** 热搜主数据；按配置的 update_interval 轮询，标签页隐藏时暂停。
+ *  轮询间隔统一从 config 读取，避免多观察者传入不同间隔相互覆盖。 */
+export function useHotsearch() {
+  const { data: config } = useConfig()
   return useQuery({
     queryKey: qk.hotsearch,
     queryFn: async () => {
@@ -59,7 +61,7 @@ export function useHotsearch(updateIntervalSec?: number) {
       if (!r.success) throw new Error('获取热搜数据失败')
       return r
     },
-    refetchInterval: (updateIntervalSec ?? 300) * 1000,
+    refetchInterval: (config?.update_interval ?? 300) * 1000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     staleTime: 30_000,
@@ -142,8 +144,8 @@ export function useRefreshPlatform(): StandardMutation<string, { items: HotSearc
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (platform: string) => {
-      const r = await API.refreshPlatform(platform) as { success: boolean; data?: HotSearchItem[]; update_time?: string; message?: string }
-      if (!r.success) throw new Error(r.message || '刷新失败')
+      const r = await API.refreshPlatform(platform) as { success: boolean; data?: HotSearchItem[]; update_time?: string; error?: string; message?: string }
+      if (!r.success) throw new Error(r.error || r.message || '刷新失败')
       return { items: r.data ?? [], update_time: r.update_time ?? '' }
     },
     onSuccess: ({ items, update_time }, platform) => {
@@ -199,7 +201,8 @@ export function useLatestSnapshotId() {
   })
 }
 
-/** 最新快照与上一快照的排名变化（「平台|标题」→ change） */
+/** 最新快照与上一快照的排名变化（「平台|标题」→ change）。
+ *  不单独轮询：snapshotId 变化（有新快照）时自动重新获取。 */
 export function useRankChanges() {
   const { data: snapshotId } = useLatestSnapshotId()
   return useQuery({
@@ -214,7 +217,6 @@ export function useRankChanges() {
     },
     enabled: !!snapshotId,
     staleTime: 60_000,
-    refetchInterval: 120_000,
   })
 }
 
@@ -223,9 +225,8 @@ export function useHealth() {
   return useQuery({
     queryKey: ['health'] as const,
     queryFn: async () => {
-      const r = await fetch('/health')
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
-      return (await r.json()) as { status: string; uptime: string; platforms_count: number; keywords_count: number }
+      const r = await API.health() as { status: string; uptime: string; platforms_count: number; keywords_count: number }
+      return r
     },
     staleTime: 30_000,
     refetchInterval: 60_000,

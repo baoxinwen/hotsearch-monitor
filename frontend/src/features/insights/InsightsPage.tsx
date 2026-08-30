@@ -9,7 +9,7 @@ import { RefreshCw } from 'lucide-react'
 import { useOverview, usePlatforms, qk } from '../../lib/queries'
 import { useUIStore } from '../../lib/store'
 import { formatScore } from '../../lib/format'
-import { platformName } from '../../lib/live'
+import { platformName, safeExternalUrl } from '../../lib/live'
 import { Button, Card, EmptyState, Skeleton } from '../../components/ui'
 
 const CHART_COLORS = [
@@ -153,7 +153,7 @@ export function InsightsPage() {
                 <span className={`tnum flex h-[20px] w-[22px] flex-shrink-0 items-center justify-center rounded-xs text-[11px] ${item.rank <= 3 ? 'bg-accent font-bold text-on-accent' : 'font-semibold text-mute'}`}>
                   {item.rank}
                 </span>
-                <a href={item.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-[13px] text-ink hover:text-link">
+                <a href={safeExternalUrl(item.url) || undefined} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1 truncate text-[13px] text-ink hover:text-link">
                   {item.title}
                 </a>
                 <span className="tnum flex-shrink-0 text-xs text-mute">{item.score > 0 ? formatScore(item.score) : item.hot_display}</span>

@@ -75,7 +75,7 @@ export function ArchivePage() {
                 key={s.id}
                 snap={s}
                 last={i === snaps.length - 1}
-                onOpen={() => navigate(`/archive/${s.id}${searchParams.get('q') ? `?q=${searchParams.get('q')}` : ''}`)}
+                onOpen={() => navigate(`/archive/${s.id}${searchParams.get('q') ? `?q=${encodeURIComponent(searchParams.get('q')!)}` : ''}`)}
               />
             ))}
           </Card>

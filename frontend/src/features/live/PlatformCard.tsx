@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import type { HotSearchItem } from '../../types'
 import { formatScore } from '../../lib/format'
-import { highlightParts } from '../../lib/live'
+import { highlightParts, safeExternalUrl } from '../../lib/live'
 import { useRefreshPlatform } from '../../lib/queries'
 import { Spinner } from '../../components/ui'
 
@@ -58,7 +58,7 @@ export function PlatformCard({
               {item.rank}
             </span>
             <a
-              href={item.url}
+              href={safeExternalUrl(item.url) || undefined}
               target="_blank"
               rel="noopener noreferrer"
               className="min-w-0 flex-1 truncate text-[13px] text-body group-hover:text-ink"

@@ -4,9 +4,11 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { CommandPalette, useGlobalShortcuts } from './CommandPalette'
 import { useTheme } from '../hooks/useTheme'
+import { useUIStore } from '../lib/store'
 
 export function Shell() {
-  const [paletteOpen, setPaletteOpen] = useState(false)
+  const paletteOpen = useUIStore((s) => s.paletteOpen)
+  const setPaletteOpen = useUIStore((s) => s.setPaletteOpen)
   const [menuOpen, setMenuOpen] = useState(false)
   const { isDark, toggle } = useTheme()
   const { pathname } = useLocation()
@@ -24,7 +26,7 @@ export function Shell() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setPaletteOpen((v) => !v)
+        setPaletteOpen(!paletteOpen)
       }
     }
     window.addEventListener('keydown', onKey)

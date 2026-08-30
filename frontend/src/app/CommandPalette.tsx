@@ -11,18 +11,23 @@ import { useHotsearch } from '../lib/queries'
 import { useEnablePlatform } from '../lib/queries'
 import { useConfig, usePlatforms } from '../lib/queries'
 
-/** 全局快捷键：1-4 切页 / r 刷新 / t 切主题 / ⌘K 面板（面板自身由 cmdk 处理） */
+/** 全局快捷键：1-4 切页 / r 刷新 / t 切主题 / d 切密度 / / 聚焦搜索
+ *  输入中（含 IME 组合）、命令面板或对话框打开时全部跳过 */
 export function useGlobalShortcuts(toggleTheme: () => void) {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const setDensity = useUIStore((s) => s.setDensity)
   const density = useUIStore((s) => s.density)
+  const paletteOpen = useUIStore((s) => s.paletteOpen)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const el = document.activeElement
-      const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
-      if (typing || e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return
+      const el = document.activeElement as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      // 有模态（命令面板 / Radix Dialog）打开时不响应页面级快捷键
+      if (paletteOpen || document.querySelector('[role="dialog"][data-state="open"]')) return
+
       if (e.key === '1') navigate('/')
       else if (e.key === '2') navigate('/insights')
       else if (e.key === '3') navigate('/archive')
@@ -30,10 +35,14 @@ export function useGlobalShortcuts(toggleTheme: () => void) {
       else if (e.key === 'r') void qc.invalidateQueries({ queryKey: qk.hotsearch })
       else if (e.key === 't') toggleTheme()
       else if (e.key === 'd') setDensity(density === 'cozy' ? 'compact' : 'cozy')
+      else if (e.key === '/') {
+        e.preventDefault()
+        document.querySelector<HTMLInputElement>('[data-hotsearch-input]')?.focus()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [navigate, qc, toggleTheme, density, setDensity])
+  }, [navigate, qc, toggleTheme, density, setDensity, paletteOpen])
 }
 
 export function CommandPalette({
@@ -98,7 +107,7 @@ export function CommandPalette({
         {disabled && disabled.length > 0 && (
           <Command.Group heading="重新启用已禁用平台" className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-ash">
             {disabled.map((p) => (
-              <DisabledItem key={p} platform={p} onSelect={() => run(() => enablePlatform.mutate(p))} />
+              <DisabledItem key={p.key} platform={p.key} name={p.name} onSelect={() => run(() => enablePlatform.mutate(p.key))} />
             ))}
           </Command.Group>
         )}
@@ -113,11 +122,16 @@ export function CommandPalette({
 }
 
 function useHotsearchDisabled() {
-  const { data } = useHotsearch(useConfig().data?.update_interval)
+  // 保留平台 key（后端 enable 接口只认 key，不认显示名）
+  const { data } = useHotsearch()
   const { data: platforms } = usePlatforms()
   if (!data) return { data: undefined }
-  const nameOf = (p: string) => platforms?.platforms[p]?.name ?? p
-  return { data: data.disabled_platforms.map(nameOf) }
+  return {
+    data: data.disabled_platforms.map((key) => ({
+      key,
+      name: platforms?.platforms[key]?.name ?? key,
+    })),
+  }
 }
 
 function Item({
@@ -146,14 +160,14 @@ function Item({
   )
 }
 
-function DisabledItem({ platform, onSelect }: { platform: string; onSelect: () => void }) {
+function DisabledItem({ platform, name, onSelect }: { platform: string; name: string; onSelect: () => void }) {
   return (
     <Command.Item
       onSelect={onSelect}
       className="flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13.5px] text-body data-[selected=true]:bg-surface-2 data-[selected=true]:text-ink"
     >
       <span className="text-down"><TriangleAlert size={15} /></span>
-      启用 {platform}
+      启用 {name}
       <span className="ml-auto"><Zap size={13} className="text-accent" /></span>
     </Command.Item>
   )

@@ -58,3 +58,14 @@ export function heatBarWidth(score: number, max: number): string {
 export function platformName(p: string, configs?: PlatformConfigMap): string {
   return configs?.[p]?.name ?? p
 }
+
+/** 外链消毒：只放行 http/https（外部平台的 url 字段不可信） */
+export function safeExternalUrl(url: string | undefined): string {
+  if (!url) return ''
+  try {
+    const u = new URL(url)
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : ''
+  } catch {
+    return ''
+  }
+}

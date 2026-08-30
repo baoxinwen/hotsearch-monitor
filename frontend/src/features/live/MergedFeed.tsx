@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { HotSearchItem } from '../../types'
-import { heatBarWidth, highlightParts, matchKeywords } from '../../lib/live'
+import { heatBarWidth, highlightParts, matchKeywords, safeExternalUrl } from '../../lib/live'
 import { formatScore } from '../../lib/format'
 import { usePlatforms } from '../../lib/queries'
 import { useUIStore } from '../../lib/store'
@@ -35,6 +35,7 @@ export function MergedFeed({
     estimateSize: () => rowHeight,
     overscan: 12,
   })
+  // 行高由密度令牌固定，无需动态测量（measureElement 反而引入重测开销）
 
   const scores = useMemo(() => visible.filter((x) => x.score > 0).map((x) => x.score), [visible])
   const maxScore = scores.length ? Math.max(...scores) : 0
@@ -66,8 +67,7 @@ export function MergedFeed({
           const cfg = platforms?.platforms[item.platform]
           return (
             <div
-              key={item.id + vRow.index}
-              ref={virtualizer.measureElement}
+              key={item.id}
               data-index={vRow.index}
               className="absolute inset-x-0 flex items-center gap-3 border-b border-hair-soft px-3.5 last:border-b-0 sm:px-4"
               style={{
@@ -88,7 +88,7 @@ export function MergedFeed({
                 {cfg?.name ?? item.platform}
               </span>
               <a
-                href={item.url}
+                href={safeExternalUrl(item.url) || undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="min-w-0 flex-1 truncate text-[var(--fs-title)] text-ink hover:text-link"

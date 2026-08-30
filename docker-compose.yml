@@ -3,13 +3,15 @@ services:
     image: ghcr.io/baoxinwen/hotsearch-monitor-backend:main
     container_name: hotsearch-backend
     restart: unless-stopped
+    # 只绑定本机回环：后端无需直接对外（公网流量走 nginx 前端容器），
+    # 同时防止绕过 nginx 直连后端伪造 X-Forwarded-For
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./data:/app/data
       - ./config:/app/config
       - ./logs:/app/logs
-      - /usr/share/zoneinfo/Asia/Shanghai:/etc/localtime:ro
+      # 说明：不再挂载宿主 zoneinfo（Windows/macOS 宿主路径不存在），统一用 TZ 环境变量
     environment:
       - TZ=Asia/Shanghai
       - DEBUG=${DEBUG:-false}
@@ -18,6 +20,7 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-}
       - HISTORY_ENABLED=${HISTORY_ENABLED:-true}
       - HISTORY_RETENTION_DAYS=${HISTORY_RETENTION_DAYS:-7}
+      - MAX_HISTORY_SNAPSHOTS=${MAX_HISTORY_SNAPSHOTS:-1000}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

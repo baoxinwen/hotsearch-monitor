@@ -109,7 +109,12 @@ export function SnapshotDetailPage() {
 }
 
 function exportCsv(snap: HistorySnapshot) {
-  const esc = (x: string) => `"${(x || '').replace(/"/g, '""').replace(/[\r\n]+/g, ' ')}"`
+  // 防公式注入：以 = + - @ 或制表符开头的单元格前置单引号
+  const esc = (x: string) => {
+    let v = (x || '').replace(/"/g, '""').replace(/[\r\n]+/g, ' ')
+    if (/^[=+\-@\t]/.test(v)) v = "'" + v
+    return `"${v}"`
+  }
   let csv = '平台,排名,标题,热度,链接\n'
   for (const [p, items] of Object.entries(snap.data)) {
     for (const i of items) {
