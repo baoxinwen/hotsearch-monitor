@@ -45,8 +45,8 @@ desktop.ini
 CLAUDE.md
 DESIGN.md
 
-# 本地临时目录
-test/
+# 本地临时目录（仅根目录，避免误伤 frontend/src/test/）
+/test/
 .ui-screenshots/
 
 # ZCode CLI 本地产物
