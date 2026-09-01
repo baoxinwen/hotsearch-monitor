@@ -16,7 +16,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <aside
-      className={`flex flex-shrink-0 flex-col overflow-hidden border-r border-hair-soft bg-sidebar transition-[width] duration-200 ${
+      className={`flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-hair-soft bg-sidebar transition-[width] duration-200 ${
         collapsed ? 'w-[60px]' : 'w-[216px]'
       }`}
     >

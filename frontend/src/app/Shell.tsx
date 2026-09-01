@@ -35,8 +35,8 @@ export function Shell() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-canvas">
-      {/* 桌面侧栏 */}
-      <div className="hidden lg:block">
+      {/* 桌面侧栏（flex 拉伸使 aside 占满全高） */}
+      <div className="hidden lg:flex">
         <Sidebar />
       </div>
 
