@@ -1,4 +1,6 @@
-FROM node:20-alpine AS builder
+# 构建产物为纯静态文件，与目标架构无关；builder 固定在原生架构执行，
+# 避免 arm64 在 QEMU 模拟中运行 npm（GitHub runner 上已知会间歇性挂死）
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 
 WORKDIR /app
 # npm ci 严格按 package-lock 安装，保证构建可复现
