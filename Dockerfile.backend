@@ -2,20 +2,25 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# 安装依赖 + curl（健康检查用）
+# 安装依赖 + curl（健康检查）+ gosu（入口脚本降权用）
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir -r requirements.txt \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends curl gosu \
+    && rm -rf /var/lib/apt/lists/*
 
 # 复制后端代码
 COPY backend/ ./backend/
 
-# 创建运行时目录 + 非 root 运行用户
-# 注意：compose 若把宿主目录 bind-mount 进来，Linux 宿主需保证 uid 1000 可写
+# 创建运行时目录与运行用户；容器以 root 启动（入口脚本修目录属主后降权）
 RUN mkdir -p data/history config logs \
     && useradd -r -u 1000 -M appuser \
     && chown -R appuser:appuser /app
 
-USER appuser
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
